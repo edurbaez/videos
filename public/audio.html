@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de Audio</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0f;
+      --surface: #18181c;
+      --surface2:#222228;
+      --border:  #2e2e38;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    .nav {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .nav a:hover { color: var(--text); border-color: var(--accent); }
+    .nav a.active { color: var(--accent2); border-color: var(--accent2); }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+
+    /* Selector de voz */
+    .voice-selector {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .voice-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .voice-btn:hover { border-color: var(--accent); color: var(--text); }
+    .voice-btn.selected-fem {
+      border-color: #ec4899;
+      background: #ec489918;
+      color: #f9a8d4;
+    }
+    .voice-btn.selected-mas {
+      border-color: #3b82f6;
+      background: #3b82f618;
+      color: #93c5fd;
+    }
+    .voice-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .btn-gen {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      transition: opacity 0.2s;
+    }
+    .btn-gen:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Pasos de progreso */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 20px;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      transition: all 0.3s;
+    }
+    .step.active { background: #3730a318; color: var(--accent2); }
+    .step.done   { color: var(--success); }
+    .step.error  { color: #fca5a5; }
+    .step-icon { font-size: 1.1rem; min-width: 24px; text-align: center; }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid #ffffff22;
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Resultado */
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .copy-wrap { position: relative; }
+    .copy-wrap textarea { padding-right: 72px; }
+    .btn-copy {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .btn-copy:hover { color: var(--text); }
+
+    audio {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+      background: var(--surface2);
+    }
+
+    .tg-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #15803d22;
+      border: 1px solid var(--success);
+      color: var(--success);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .tg-badge-error {
+      background: #7f1d1d44;
+      border-color: var(--error);
+      color: #fca5a5;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <nav class="nav">
+    <a href="/index.html">Inicio</a>
+    <a href="/guion.html">Guion</a>
+    <a href="/imagenes.html">Imagenes</a>
+    <a href="/audio.html" class="active">Audio</a>
+  </nav>
+
+  <h1>Generador de Audio</h1>
+  <p class="subtitle">Escribe el tema, elige la voz y genera el guion + audio via Google TTS → Telegram.</p>
+
+  <div class="card">
+    <label for="tema">Tema del guion</label>
+    <textarea id="tema" rows="3" placeholder="Ej: la disciplina como habito diario..."></textarea>
+
+    <div class="voice-label" style="margin-top:20px">Voz</div>
+    <div class="voice-selector">
+      <button class="voice-btn selected-fem" id="btnFem" onclick="selectVoz('femenino')">
+        <span style="font-size:1.4rem">&#9792;</span>
+        Femenina
+      </button>
+      <button class="voice-btn" id="btnMas" onclick="selectVoz('masculino')">
+        <span style="font-size:1.4rem">&#9794;</span>
+        Masculina
+      </button>
+    </div>
+
+    <button class="btn-gen" id="btnGenerar">
+      Generar guion + audio → Telegram
+    </button>
+  </div>
+
+  <!-- Progreso -->
+  <div class="hidden" id="cardProgreso">
+    <div class="steps">
+      <div class="step" id="paso1">
+        <span class="step-icon" id="ico1">&#9679;</span>
+        <span id="txt1">Generando guion...</span>
+      </div>
+      <div class="step" id="paso2">
+        <span class="step-icon" id="ico2">&#9679;</span>
+        <span id="txt2">Generando audio con Google TTS...</span>
+      </div>
+      <div class="step" id="paso3">
+        <span class="step-icon" id="ico3">&#9679;</span>
+        <span id="txt3">Enviando a Telegram...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resultado -->
+  <div class="card hidden" id="cardResultado">
+    <div id="tgBadge" class="tg-badge">
+      <span>&#9989;</span> Audio enviado a Telegram
+    </div>
+
+    <div class="section-title">Guion generado</div>
+    <div class="copy-wrap" style="margin-bottom:20px">
+      <textarea id="outGuion" rows="9" readonly></textarea>
+      <button class="btn-copy" onclick="copiar('outGuion', this)">Copiar</button>
+    </div>
+
+    <div class="section-title">Audio</div>
+    <audio id="audioPlayer" controls src=""></audio>
+  </div>
+
+</div>
+
+<script>
+let vozSeleccionada = 'femenino';
+
+function selectVoz(voz) {
+  vozSeleccionada = voz;
+  document.getElementById('btnFem').className = 'voice-btn' + (voz === 'femenino' ? ' selected-fem' : '');
+  document.getElementById('btnMas').className = 'voice-btn' + (voz === 'masculino' ? ' selected-mas' : '');
+}
+
+function copiar(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).value).then(() => {
+    btn.textContent = 'Copiado';
+    setTimeout(() => btn.textContent = 'Copiar', 1500);
+  });
+}
+
+function setPaso(n, estado) {
+  // estado: 'active' | 'done' | 'error' | ''
+  const paso = document.getElementById(`paso${n}`);
+  const ico  = document.getElementById(`ico${n}`);
+  paso.className = 'step ' + estado;
+  if (estado === 'active') {
+    ico.innerHTML = '<div class="spinner"></div>';
+  } else if (estado === 'done') {
+    ico.textContent = '✓';
+  } else if (estado === 'error') {
+    ico.textContent = '✗';
+  } else {
+    ico.textContent = '●';
+  }
+}
+
+let es = null;
+
+document.getElementById('btnGenerar').addEventListener('click', async () => {
+  const tema = document.getElementById('tema').value.trim();
+  if (!tema) {
+    alert('Escribe el tema antes de continuar.');
+    return;
+  }
+
+  if (es) { es.close(); es = null; }
+
+  const btn = document.getElementById('btnGenerar');
+  btn.disabled = true;
+  btn.textContent = 'Procesando...';
+
+  // Reset UI
+  document.getElementById('cardResultado').classList.add('hidden');
+  document.getElementById('cardProgreso').classList.remove('hidden');
+  [1, 2, 3].forEach(n => setPaso(n, ''));
+  setPaso(1, 'active');
+
+  try {
+    const resp = await fetch('/util/audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tema, genero: vozSeleccionada }),
+    });
+    const { id, error } = await resp.json();
+    if (error) throw new Error(error);
+
+    es = new EventSource(`/util/audio-progress/${id}`);
+
+    es.addEventListener('progreso', e => {
+      const { paso } = JSON.parse(e.data);
+      // Marcar paso anterior como done
+      if (paso > 1) setPaso(paso - 1, 'done');
+      setPaso(paso, 'active');
+    });
+
+    es.addEventListener('guion_listo', e => {
+      const { guion } = JSON.parse(e.data);
+      document.getElementById('outGuion').value = guion;
+    });
+
+    es.addEventListener('audio_listo', e => {
+      const { url } = JSON.parse(e.data);
+      document.getElementById('audioPlayer').src = url;
+    });
+
+    es.addEventListener('finalizado', e => {
+      const { url, guion } = JSON.parse(e.data);
+      es.close(); es = null;
+
+      // Marcar todos como done
+      [1, 2, 3].forEach(n => setPaso(n, 'done'));
+
+      document.getElementById('outGuion').value = guion;
+      document.getElementById('audioPlayer').src = url;
+
+      const badge = document.getElementById('tgBadge');
+      badge.className = 'tg-badge';
+      badge.innerHTML = '<span>&#9989;</span> Audio enviado a Telegram';
+
+      document.getElementById('cardResultado').classList.remove('hidden');
+      document.getElementById('cardResultado').scrollIntoView({ behavior: 'smooth' });
+
+      btn.disabled = false;
+      btn.textContent = 'Generar guion + audio → Telegram';
+    });
+
+    es.addEventListener('error', e => {
+      let datos = {};
+      try { datos = JSON.parse(e.data || '{}'); } catch (_) {}
+
+      // Marcar paso activo como error
+      [1, 2, 3].forEach(n => {
+        if (document.getElementById(`paso${n}`).classList.contains('active')) setPaso(n, 'error');
+      });
+
+      const badge = document.getElementById('tgBadge');
+      badge.className = 'tg-badge tg-badge-error';
+      badge.innerHTML = '<span>&#10060;</span> ' + (datos.mensaje || 'Error desconocido');
+      document.getElementById('cardResultado').classList.remove('hidden');
+
+      if (es) { es.close(); es = null; }
+      btn.disabled = false;
+      btn.textContent = 'Generar guion + audio → Telegram';
+    });
+
+  } catch (err) {
+    alert('Error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Generar guion + audio → Telegram';
+  }
+});
+</script>
+</body>
+</html>

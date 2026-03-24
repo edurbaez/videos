@@ -1,0 +1,22 @@
+node_modules/
+.env
+*.log
+
+# Ignorar archivos generados pero conservar estructura de carpetas
+output/audios/*
+!output/audios/.gitkeep
+output/guiones/*
+!output/guiones/.gitkeep
+output/imagenes/*
+!output/imagenes/.gitkeep
+output/subtitulos/*
+!output/subtitulos/.gitkeep
+output/videos/*
+!output/videos/.gitkeep
+
+# Datos de runtime
+historial.json
+
+# Archivos personales/IDE
+.claude/
+sugerencias.md

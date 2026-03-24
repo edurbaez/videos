@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de Imágenes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0f;
+      --surface: #18181c;
+      --surface2:#222228;
+      --border:  #2e2e38;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .container { max-width: 720px; margin: 0 auto; }
+
+    /* Nav */
+    .nav {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .nav a:hover { color: var(--text); border-color: var(--accent); }
+    .nav a.active { color: var(--accent2); border-color: var(--accent2); }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+
+    /* API selector */
+    .api-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .api-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .api-btn:hover { border-color: var(--accent); color: var(--text); }
+    .api-btn.selected-google {
+      border-color: #4285f4;
+      background: #4285f422;
+      color: #93c5fd;
+    }
+    .api-btn.selected-openai {
+      border-color: #10a37f;
+      background: #10a37f22;
+      color: #6ee7b7;
+    }
+    .api-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    /* Cantidad */
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    select:focus { border-color: var(--accent); }
+
+    .form-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-top: 16px; }
+    .form-row .field { flex: 1; min-width: 160px; }
+
+    /* Botón generar */
+    .btn-gen {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      transition: opacity 0.2s;
+    }
+    .btn-gen:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Status */
+    .status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+    .status.sending {
+      display: flex;
+      background: #3730a322;
+      border: 1px solid var(--accent);
+      color: var(--accent2);
+    }
+    .status.ok {
+      display: flex;
+      background: #15803d22;
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+    .status.error {
+      display: flex;
+      background: #7f1d1d44;
+      border: 1px solid var(--error);
+      color: #fca5a5;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid #ffffff33;
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Grid imágenes */
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .progress-bar-wrap {
+      background: var(--surface2);
+      border-radius: 6px;
+      height: 6px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width 0.4s;
+    }
+
+    .images-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .img-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    .img-card img {
+      width: 100%;
+      aspect-ratio: 9/16;
+      object-fit: cover;
+      display: block;
+    }
+    .img-badge {
+      position: absolute;
+      bottom: 6px; left: 6px;
+      background: #000000aa;
+      color: #fff;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+    }
+    .img-badge.ok { background: #15803dcc; }
+    .img-download {
+      position: absolute;
+      bottom: 6px; right: 6px;
+      background: #000000aa;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Navegacion -->
+  <nav class="nav">
+    <a href="/index.html">Inicio</a>
+    <a href="/guion.html">Guion</a>
+    <a href="/imagenes.html" class="active">Imagenes</a>
+    <a href="/audio.html">Audio</a>
+  </nav>
+
+  <h1>Generador de Imagenes</h1>
+  <p class="subtitle">Escribe el prompt directamente y genera imagenes con la API que prefieras.</p>
+
+  <div class="card">
+    <!-- Selector de API -->
+    <div class="api-badge">API de generacion</div>
+    <div class="api-selector">
+      <button class="api-btn selected-google" id="btnGoogle" onclick="selectApi('google')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Google Imagen
+      </button>
+      <button class="api-btn" id="btnOpenAI" onclick="selectApi('openai')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
+        </svg>
+        OpenAI DALL-E
+      </button>
+    </div>
+
+    <!-- Prompt -->
+    <label for="prompt">Prompt de la imagen</label>
+    <textarea id="prompt" rows="5" placeholder="Ej: A dramatic cinematic portrait of a determined athlete at sunrise, ultra-realistic, 9:16 vertical format..."></textarea>
+
+    <!-- Cantidad y opciones -->
+    <div class="form-row">
+      <div class="field">
+        <label for="cantidad">Cantidad de imagenes</label>
+        <select id="cantidad">
+          <option value="1">1 imagen</option>
+          <option value="2" selected>2 imagenes</option>
+          <option value="3">3 imagenes</option>
+          <option value="4">4 imagenes</option>
+          <option value="5">5 imagenes</option>
+        </select>
+      </div>
+      <div class="field" id="wrapModelo">
+        <label for="modelo">Modelo</label>
+        <select id="modelo">
+          <option value="imagen-3.0-generate-002" data-api="google">Imagen 3</option>
+          <option value="imagen-4.0-generate-preview-05-20" data-api="google">Imagen 4 (preview)</option>
+          <option value="dall-e-3" data-api="openai">DALL-E 3</option>
+          <option value="dall-e-2" data-api="openai">DALL-E 2</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-gen" id="btnGenerar">
+      Generar imagenes
+    </button>
+  </div>
+
+  <!-- Status -->
+  <div class="status" id="status">
+    <div class="spinner" id="statusSpinner"></div>
+    <span id="statusTexto"></span>
+  </div>
+
+  <!-- Resultado -->
+  <div class="card hidden" id="cardResultado">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="section-title" style="margin-bottom:0" id="resultTitulo">Imagenes generadas</div>
+      <span id="imgContador" style="font-size:0.82rem;color:var(--muted)"></span>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="imgProgressBar"></div></div>
+    <div class="images-grid" id="imgGrid"></div>
+  </div>
+
+</div>
+
+<script>
+let apiSeleccionada = 'google';
+
+function selectApi(api) {
+  apiSeleccionada = api;
+
+  const btnG = document.getElementById('btnGoogle');
+  const btnO = document.getElementById('btnOpenAI');
+  btnG.className = 'api-btn' + (api === 'google' ? ' selected-google' : '');
+  btnO.className = 'api-btn' + (api === 'openai' ? ' selected-openai' : '');
+
+  // Filtrar modelos según API
+  const modelo = document.getElementById('modelo');
+  Array.from(modelo.options).forEach(opt => {
+    opt.hidden = opt.dataset.api !== api;
+  });
+  // Seleccionar primer modelo visible
+  const primera = Array.from(modelo.options).find(o => o.dataset.api === api);
+  if (primera) modelo.value = primera.value;
+}
+
+// Inicializar modelos
+selectApi('google');
+
+function setStatus(tipo, texto) {
+  const el = document.getElementById('status');
+  el.className = 'status ' + tipo;
+  document.getElementById('statusTexto').textContent = texto;
+  document.getElementById('statusSpinner').style.display = tipo === 'sending' ? 'block' : 'none';
+}
+
+let esImg = null;
+
+document.getElementById('btnGenerar').addEventListener('click', async () => {
+  const prompt = document.getElementById('prompt').value.trim();
+  const cantidad = parseInt(document.getElementById('cantidad').value);
+  const modelo = document.getElementById('modelo').value;
+
+  if (!prompt) {
+    setStatus('error', 'Escribe el prompt antes de continuar.');
+    return;
+  }
+
+  if (esImg) { esImg.close(); esImg = null; }
+
+  const btn = document.getElementById('btnGenerar');
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+
+  const card = document.getElementById('cardResultado');
+  document.getElementById('imgGrid').innerHTML = '';
+  document.getElementById('imgProgressBar').style.width = '0%';
+  document.getElementById('imgContador').textContent = `0 / ${cantidad}`;
+  document.getElementById('resultTitulo').textContent = 'Generando...';
+  card.classList.remove('hidden');
+  card.scrollIntoView({ behavior: 'smooth' });
+
+  setStatus('sending', 'Iniciando generacion de imagenes...');
+
+  try {
+    const resp = await fetch('/util/imagenes-directas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, cantidad, modelo, api: apiSeleccionada }),
+    });
+    const { id, error } = await resp.json();
+    if (error) throw new Error(error);
+
+    esImg = new EventSource(`/util/imagenes-progress/${id}`);
+
+    esImg.addEventListener('progreso', e => {
+      const { mensaje } = JSON.parse(e.data);
+      document.getElementById('resultTitulo').textContent = mensaje;
+      setStatus('sending', mensaje);
+    });
+
+    esImg.addEventListener('imagen_lista', e => {
+      const { n, total, urlPublica } = JSON.parse(e.data);
+      document.getElementById('imgContador').textContent = `${n} / ${total}`;
+      document.getElementById('imgProgressBar').style.width = `${(n / total) * 100}%`;
+      document.getElementById('resultTitulo').textContent = `Imagen ${n}/${total} lista`;
+
+      const card2 = document.createElement('div');
+      card2.className = 'img-card';
+      card2.id = `img-card-${n}`;
+      card2.innerHTML = `
+        <img src="${urlPublica}" alt="Imagen ${n}" />
+        <span class="img-badge" id="badge-${n}">Enviando...</span>
+        <a class="img-download" href="${urlPublica}" download="imagen-${n}.png" target="_blank">Guardar</a>
+      `;
+      document.getElementById('imgGrid').appendChild(card2);
+    });
+
+    esImg.addEventListener('telegram_ok', e => {
+      const { n } = JSON.parse(e.data);
+      const badge = document.getElementById(`badge-${n}`);
+      if (badge) { badge.textContent = 'Enviada'; badge.classList.add('ok'); }
+    });
+
+    esImg.addEventListener('telegram_error', e => {
+      const { n, mensaje } = JSON.parse(e.data);
+      const badge = document.getElementById(`badge-${n}`);
+      if (badge) { badge.textContent = 'Error TG'; badge.style.background = '#7f1d1dcc'; }
+      console.error(`[img] Telegram error imagen ${n}:`, mensaje);
+    });
+
+    esImg.addEventListener('finalizado', e => {
+      const { total } = JSON.parse(e.data);
+      esImg.close(); esImg = null;
+      document.getElementById('resultTitulo').textContent = `${total} imagen${total !== 1 ? 'es' : ''} generada${total !== 1 ? 's' : ''}`;
+      document.getElementById('imgProgressBar').style.width = '100%';
+      setStatus('ok', `${total} imagen${total !== 1 ? 'es' : ''} generada${total !== 1 ? 's' : ''} correctamente.`);
+      btn.disabled = false;
+      btn.textContent = 'Generar imagenes';
+    });
+
+    esImg.addEventListener('error', e => {
+      let datos = {};
+      try { datos = JSON.parse(e.data || '{}'); } catch (_) {}
+      setStatus('error', datos.mensaje || 'Error generando imagenes.');
+      if (esImg) { esImg.close(); esImg = null; }
+      btn.disabled = false;
+      btn.textContent = 'Generar imagenes';
+    });
+
+  } catch (err) {
+    setStatus('error', err.message);
+    btn.disabled = false;
+    btn.textContent = 'Generar imagenes';
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guion → Telegram</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0f;
+      --surface: #18181c;
+      --surface2:#222228;
+      --border:  #2e2e38;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      margin-top: 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      transition: opacity 0.2s;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Estado de envío */
+    .status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+    .status.sending {
+      display: flex;
+      background: #3730a322;
+      border: 1px solid var(--accent);
+      color: var(--accent2);
+    }
+    .status.ok {
+      display: flex;
+      background: #15803d22;
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+    .status.error {
+      display: flex;
+      background: #7f1d1d44;
+      border: 1px solid var(--error);
+      color: #fca5a5;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid #ffffff33;
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .result-block {
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .result-block textarea {
+      padding-right: 70px;
+    }
+    .btn-copy {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .btn-copy:hover { color: var(--text); }
+
+    .hidden { display: none !important; }
+
+    .images-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .img-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    .img-card img {
+      width: 100%;
+      aspect-ratio: 9/16;
+      object-fit: cover;
+      display: block;
+    }
+    .img-badge {
+      position: absolute;
+      bottom: 6px; left: 6px;
+      background: #000000aa;
+      color: #fff;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+    }
+    .img-badge.ok { background: #15803dcc; }
+    .progress-bar-wrap {
+      background: var(--surface2);
+      border-radius: 6px;
+      height: 6px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width 0.4s;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- NAV -->
+  <nav style="display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;">
+    <a href="/index.html" style="color:var(--muted);text-decoration:none;font-size:0.875rem;padding:6px 14px;border:1px solid var(--border);border-radius:20px;transition:color 0.2s,border-color 0.2s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Inicio</a>
+    <a href="/guion.html" style="color:var(--accent2);text-decoration:none;font-size:0.875rem;padding:6px 14px;border:1px solid var(--accent2);border-radius:20px;">Guion</a>
+    <a href="/imagenes.html" style="color:var(--muted);text-decoration:none;font-size:0.875rem;padding:6px 14px;border:1px solid var(--border);border-radius:20px;transition:color 0.2s,border-color 0.2s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Imagenes</a>
+    <a href="/audio.html" style="color:var(--muted);text-decoration:none;font-size:0.875rem;padding:6px 14px;border:1px solid var(--border);border-radius:20px;transition:color 0.2s,border-color 0.2s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Audio</a>
+  </nav>
+
+  <h1>Guion → Telegram</h1>
+  <p class="subtitle">Genera el guion y el caption a partir de un tema y los envía directo a Telegram.</p>
+
+  <!-- Formulario -->
+  <div class="card">
+    <label for="tema">Tema</label>
+    <textarea id="tema" rows="3" placeholder="Ej: la disciplina como hábito diario..."></textarea>
+
+    <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:flex-end">
+      <button class="btn" id="btnEnviar" style="flex:2;min-width:200px;margin-top:0">
+        📝 Generar guion → Telegram
+      </button>
+      <div style="flex:1;min-width:140px">
+        <label for="cantImg" style="margin-bottom:4px">Imágenes</label>
+        <select id="cantImg" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:0.9rem;outline:none">
+          <option value="2" selected>2 imágenes</option>
+          <option value="3">3 imágenes</option>
+          <option value="4">4 imágenes</option>
+          <option value="5">5 imágenes</option>
+        </select>
+      </div>
+      <button class="btn" id="btnImagenes" style="flex:2;min-width:200px;margin-top:0;background:linear-gradient(135deg,#065f46,#059669)">
+        🖼️ Generar imágenes → Telegram
+      </button>
+    </div>
+  </div>
+
+  <!-- Estado -->
+  <div class="status" id="status">
+    <div class="spinner" id="statusSpinner"></div>
+    <span id="statusTexto"></span>
+  </div>
+
+  <!-- Resultado imágenes -->
+  <div class="card hidden" id="cardImagenes">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:0" id="imgTitulo">Imágenes</div>
+      <span id="imgContador" style="font-size:0.82rem;color:var(--muted)"></span>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="imgProgressBar"></div></div>
+    <div class="images-grid" id="imgGrid"></div>
+  </div>
+
+  <!-- Resultado guion -->
+  <div class="card hidden" id="cardResultado">
+    <div class="section-title" style="margin-bottom:12px">Mensaje enviado a Telegram</div>
+
+    <div class="section-title">Guion</div>
+    <div class="result-block">
+      <textarea id="outGuion" rows="8" readonly></textarea>
+      <button class="btn-copy" onclick="copiar('outGuion', this)">Copiar</button>
+    </div>
+
+    <div class="section-title">Caption</div>
+    <div class="result-block">
+      <textarea id="outCaption" rows="3" readonly></textarea>
+      <button class="btn-copy" onclick="copiar('outCaption', this)">Copiar</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function copiar(id, btn) {
+  const ta = document.getElementById(id);
+  navigator.clipboard.writeText(ta.value).then(() => {
+    btn.textContent = '¡Copiado!';
+    setTimeout(() => btn.textContent = 'Copiar', 1500);
+  });
+}
+
+function setStatus(tipo, texto) {
+  const el = document.getElementById('status');
+  const spinner = document.getElementById('statusSpinner');
+  el.className = 'status ' + tipo;
+  document.getElementById('statusTexto').textContent = texto;
+  spinner.style.display = tipo === 'sending' ? 'block' : 'none';
+}
+
+document.getElementById('btnEnviar').addEventListener('click', async () => {
+  const tema = document.getElementById('tema').value.trim();
+  if (!tema) {
+    setStatus('error', 'Escribe el tema antes de continuar.');
+    return;
+  }
+
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true;
+  document.getElementById('cardResultado').classList.add('hidden');
+  setStatus('sending', 'Generando guion...');
+
+  try {
+    const resp = await fetch('/util/guion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tema }),
+    });
+
+    const datos = await resp.json();
+    if (!resp.ok) throw new Error(datos.error || 'Error desconocido.');
+
+    setStatus('ok', 'Enviado a Telegram correctamente.');
+    document.getElementById('outGuion').value = datos.guion;
+    document.getElementById('outCaption').value = datos.caption;
+    document.getElementById('cardResultado').classList.remove('hidden');
+
+  } catch (err) {
+    console.error('[guion.html]', err);
+    setStatus('error', err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Imágenes ─────────────────────────────────────────────────────────────────
+
+let esImg = null;
+
+document.getElementById('btnImagenes').addEventListener('click', async () => {
+  const tema = document.getElementById('tema').value.trim();
+  const cantidad = parseInt(document.getElementById('cantImg').value);
+  if (!tema) { setStatus('error', 'Escribe el tema antes de continuar.'); return; }
+
+  if (esImg) { esImg.close(); esImg = null; }
+
+  const btn = document.getElementById('btnImagenes');
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+
+  // Preparar card de imágenes
+  const card = document.getElementById('cardImagenes');
+  document.getElementById('imgGrid').innerHTML = '';
+  document.getElementById('imgProgressBar').style.width = '0%';
+  document.getElementById('imgContador').textContent = `0 / ${cantidad}`;
+  document.getElementById('imgTitulo').textContent = 'Generando guion base...';
+  card.classList.remove('hidden');
+  card.scrollIntoView({ behavior: 'smooth' });
+
+  setStatus('sending', 'Iniciando generación de imágenes...');
+
+  try {
+    const resp = await fetch('/util/imagenes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tema, cantidad }),
+    });
+    const { id, error } = await resp.json();
+    if (error) throw new Error(error);
+
+    esImg = new EventSource(`/util/imagenes-progress/${id}`);
+
+    esImg.addEventListener('progreso', e => {
+      const { mensaje } = JSON.parse(e.data);
+      document.getElementById('imgTitulo').textContent = mensaje;
+      setStatus('sending', mensaje);
+    });
+
+    esImg.addEventListener('imagen_lista', e => {
+      const { n, total, urlPublica } = JSON.parse(e.data);
+      document.getElementById('imgContador').textContent = `${n} / ${total}`;
+      document.getElementById('imgProgressBar').style.width = `${(n / total) * 100}%`;
+      document.getElementById('imgTitulo').textContent = `Imagen ${n}/${total} generada — enviando a Telegram...`;
+
+      const card2 = document.createElement('div');
+      card2.className = 'img-card';
+      card2.id = `img-card-${n}`;
+      card2.innerHTML = `
+        <img src="${urlPublica}" alt="Imagen ${n}" />
+        <span class="img-badge" id="badge-${n}">Enviando...</span>
+      `;
+      document.getElementById('imgGrid').appendChild(card2);
+    });
+
+    esImg.addEventListener('telegram_ok', e => {
+      const { n } = JSON.parse(e.data);
+      const badge = document.getElementById(`badge-${n}`);
+      if (badge) { badge.textContent = '✅ Enviada'; badge.classList.add('ok'); }
+    });
+
+    esImg.addEventListener('telegram_error', e => {
+      const { n, mensaje } = JSON.parse(e.data);
+      const badge = document.getElementById(`badge-${n}`);
+      if (badge) { badge.textContent = '❌ Error'; badge.style.background = '#7f1d1dcc'; }
+      console.error(`[img] Telegram error imagen ${n}:`, mensaje);
+    });
+
+    esImg.addEventListener('finalizado', e => {
+      const { total } = JSON.parse(e.data);
+      esImg.close(); esImg = null;
+      document.getElementById('imgTitulo').textContent = `${total} imágenes enviadas a Telegram`;
+      document.getElementById('imgProgressBar').style.width = '100%';
+      setStatus('ok', `${total} imágenes enviadas a Telegram correctamente.`);
+      btn.disabled = false;
+      btn.textContent = '🖼️ Generar imágenes → Telegram';
+    });
+
+    esImg.addEventListener('error', e => {
+      const datos = JSON.parse(e.data || '{}');
+      console.error('[img] error:', datos);
+      setStatus('error', datos.mensaje || 'Error generando imágenes.');
+      esImg.close(); esImg = null;
+      btn.disabled = false;
+      btn.textContent = '🖼️ Generar imágenes → Telegram';
+    });
+
+  } catch (err) {
+    console.error('[btnImagenes]', err);
+    setStatus('error', err.message);
+    btn.disabled = false;
+    btn.textContent = '🖼️ Generar imágenes → Telegram';
+  }
+});
+</script>
+</body>
+</html>
