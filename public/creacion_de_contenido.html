@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creación de Contenido</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0f;
+      --surface: #18181c;
+      --surface2:#222228;
+      --border:  #2e2e38;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 0 0 60px;
+    }
+
+    /* ── Nav superior ── */
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #0d0d0fee;
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .top-nav .brand {
+      font-weight: 700;
+      font-size: 1rem;
+      background: linear-gradient(135deg, var(--accent2), #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .top-nav .sep { color: var(--border); }
+    .section-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .section-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      padding: 5px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .section-links a:hover { color: var(--text); border-color: var(--accent); }
+    .section-links a.active { color: var(--accent2); border-color: var(--accent2); }
+
+    /* ── Container ── */
+    .container { max-width: 860px; margin: 0 auto; padding: 32px 16px; }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-icon {
+      font-size: 2rem;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+    .section-header h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .section-header p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+
+    .section-divider {
+      border: none;
+      border-top: 2px solid var(--border);
+      margin: 48px 0;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card h3 { font-size: 1rem; font-weight: 600; color: var(--accent2); margin-bottom: 16px; }
+
+    /* ── Forms ── */
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+
+    textarea, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+    textarea:focus, select:focus { border-color: var(--accent); }
+    select { resize: none; cursor: pointer; }
+
+    .form-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+    .form-row .field { flex: 1; min-width: 200px; }
+    .form-row .field-sm { flex: 0 0 160px; }
+
+    /* ── Buttons ── */
+    .btn-gen {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      transition: opacity 0.2s;
+    }
+    .btn-gen:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+    /* ── API / Voice selector ── */
+    .sel-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .sel-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .sel-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sel-btn:hover { border-color: var(--accent); color: var(--text); }
+    .sel-btn.sel-google  { border-color:#4285f4; background:#4285f422; color:#93c5fd; }
+    .sel-btn.sel-openai  { border-color:#10a37f; background:#10a37f22; color:#6ee7b7; }
+    .sel-btn.sel-fem     { border-color:#ec4899; background:#ec489918; color:#f9a8d4; }
+    .sel-btn.sel-mas     { border-color:#3b82f6; background:#3b82f618; color:#93c5fd; }
+
+    /* ── Chips ── */
+    .param-block { margin-top: 18px; }
+    .param-block + .param-block { margin-top: 14px; }
+    .param-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.825rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--text); }
+    .chip.active { border-color: var(--accent2); background: #7c3aed28; color: var(--accent2); font-weight: 600; }
+
+    /* ── Progress steps ── */
+    .steps { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      transition: all 0.3s;
+    }
+    .step.active { background: #3730a318; color: var(--accent2); }
+    .step.done   { color: var(--success); }
+    .step.error  { color: #fca5a5; }
+    .step-icon { font-size: 1.1rem; min-width: 24px; text-align: center; }
+
+    /* ── Progress list (video) ── */
+    .progress-list { list-style: none; }
+    .progress-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+      color: var(--muted);
+      transition: color 0.3s;
+    }
+    .progress-list li:last-child { border-bottom: none; }
+    .progress-list li.done   { color: var(--text); }
+    .progress-list li.active { color: var(--accent2); }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid #ffffff22;
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Status bar ── */
+    .status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+    .status.sending { display:flex; background:#3730a322; border:1px solid var(--accent); color:var(--accent2); }
+    .status.ok      { display:flex; background:#15803d22; border:1px solid var(--success); color:var(--success); }
+    .status.error   { display:flex; background:#7f1d1d44; border:1px solid var(--error); color:#fca5a5; }
+
+    /* ── Badges ── */
+    .tg-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #15803d22;
+      border: 1px solid var(--success);
+      color: var(--success);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .tg-badge-error { background:#7f1d1d44; border-color:var(--error); color:#fca5a5; }
+
+    .telegram-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #15803d22;
+      border: 1px solid var(--success);
+      color: var(--success);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    /* ── Error banner ── */
+    .error-banner {
+      background: #7f1d1d44;
+      border: 1px solid var(--error);
+      color: #fca5a5;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .error-banner.visible { display: block; }
+
+    /* ── Copy wrapper ── */
+    .copy-wrapper { position: relative; }
+    .btn-copy {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .btn-copy:hover { color: var(--text); }
+
+    /* ── Images grid ── */
+    .images-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .img-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    .img-card img { width:100%; aspect-ratio:9/16; object-fit:cover; display:block; }
+    .img-badge {
+      position: absolute;
+      bottom: 6px; left: 6px;
+      background: #000000aa;
+      color: #fff;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+    }
+    .img-badge.ok { background: #15803dcc; }
+    .img-download {
+      position: absolute;
+      bottom: 6px; right: 6px;
+      background: #000000aa;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    /* ── Progress bar ── */
+    .progress-bar-wrap {
+      background: var(--surface2);
+      border-radius: 6px;
+      height: 6px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width 0.4s;
+    }
+
+    /* ── Audio / Video ── */
+    audio, video {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+      background: var(--surface2);
+    }
+    video { max-height: 480px; object-fit: contain; }
+
+    /* ── Section title label ── */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    /* ── Prompt items ── */
+    .prompt-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .prompt-item .prompt-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent2);
+      margin-bottom: 4px;
+    }
+    .prompt-item .prompt-text { color: var(--text); word-break: break-word; }
+
+    /* ── History ── */
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-thumb {
+      width: 52px; height: 92px;
+      object-fit: cover;
+      border-radius: 6px;
+      background: var(--surface2);
+      flex-shrink: 0;
+    }
+    .history-info { flex: 1; min-width: 0; }
+    .history-info .tema {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.95rem;
+    }
+    .history-info .fecha { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .history-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+    .detail-panel {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 10px;
+      display: none;
+    }
+    .detail-panel.open { display: block; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- NAV SUPERIOR -->
+<nav class="top-nav">
+  <a href="/index.html" class="brand">← Inicio</a>
+  <span class="sep">|</span>
+  <div class="section-links">
+    <a href="#audio">🎙️ Audio</a>
+    <a href="#imagenes">🖼️ Imágenes</a>
+    <a href="#video">🎬 Video</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECCIÓN 1: AUDIO
+  ════════════════════════════════════════════════════════ -->
+  <section id="audio">
+    <div class="section-header">
+      <div class="section-icon">🎙️</div>
+      <div>
+        <h2>Generador de Audio</h2>
+        <p>Escribe el tema, elige la voz y genera el guion + audio → Telegram.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="a_tema">Tema del guion</label>
+      <textarea id="a_tema" rows="3" placeholder="Ej: la disciplina como habito diario..."></textarea>
+
+      <div class="sel-label" style="margin-top:20px">Proveedor TTS</div>
+      <div class="sel-row">
+        <button class="sel-btn sel-google" id="a_btnGoogle" onclick="aSelectTTS('google')">
+          🔵 Google TTS
+        </button>
+        <button class="sel-btn" id="a_btnOpenAI" onclick="aSelectTTS('openai')">
+          🟢 OpenAI TTS
+        </button>
+      </div>
+
+      <div class="sel-label">Voz</div>
+      <div class="sel-row">
+        <button class="sel-btn sel-fem" id="a_btnFem" onclick="aSelectVoz('femenino')">
+          <span style="font-size:1.3rem">♀</span> Femenina
+        </button>
+        <button class="sel-btn" id="a_btnMas" onclick="aSelectVoz('masculino')">
+          <span style="font-size:1.3rem">♂</span> Masculina
+        </button>
+      </div>
+
+      <button class="btn-gen" id="a_btnGenerar">Generar guion + audio → Telegram</button>
+    </div>
+
+    <!-- Progreso audio -->
+    <div class="card hidden" id="a_cardProgreso">
+      <div class="steps">
+        <div class="step" id="a_paso1">
+          <span class="step-icon" id="a_ico1">●</span>
+          <span id="a_txt1">Generando guion...</span>
+        </div>
+        <div class="step" id="a_paso2">
+          <span class="step-icon" id="a_ico2">●</span>
+          <span id="a_txt2">Generando audio...</span>
+        </div>
+        <div class="step" id="a_paso3">
+          <span class="step-icon" id="a_ico3">●</span>
+          <span id="a_txt3">Enviando a Telegram...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resultado audio -->
+    <div class="card hidden" id="a_cardResultado">
+      <div id="a_tgBadge" class="tg-badge">
+        <span>✅</span> Audio enviado a Telegram
+      </div>
+
+      <div class="section-title">Guion generado</div>
+      <div class="copy-wrapper" style="margin-bottom:20px">
+        <textarea id="a_outGuion" rows="9" readonly></textarea>
+        <button class="btn-copy" onclick="copiar('a_outGuion', this)">Copiar</button>
+      </div>
+
+      <div class="section-title">Audio</div>
+      <audio id="a_audioPlayer" controls></audio>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECCIÓN 2: IMÁGENES
+  ════════════════════════════════════════════════════════ -->
+  <section id="imagenes">
+    <div class="section-header">
+      <div class="section-icon">🖼️</div>
+      <div>
+        <h2>Generador de Imágenes</h2>
+        <p>Escribe el prompt directamente y genera imágenes con la API que prefieras.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sel-label">API de generación</div>
+      <div class="sel-row">
+        <button class="sel-btn sel-google" id="i_btnGoogle" onclick="iSelectApi('google')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Google Imagen
+        </button>
+        <button class="sel-btn" id="i_btnOpenAI" onclick="iSelectApi('openai')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.82a5.98 5.98 0 0 0-.52-4.91 6.05 6.05 0 0 0-6.51-2.9A6.07 6.07 0 0 0 4.98 4.18a5.98 5.98 0 0 0-3.99 2.9 6.05 6.05 0 0 0 .74 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.51 2.9A5.98 5.98 0 0 0 13.26 24a6.06 6.06 0 0 0 5.77-4.21 5.99 5.99 0 0 0 3.99-2.9 6.06 6.06 0 0 0-.74-7.07zm-9.02 12.61a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.79.79 0 0 0 .39-.68V11.7l2.02 1.17a.07.07 0 0 1 .04.05v5.58a4.5 4.5 0 0 1-4.49 4.93zm-9.66-4.13a4.47 4.47 0 0 1-.53-3.01l.14.09 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 19.95a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9A4.49 4.49 0 0 1 4.71 5.92V11.6a.77.77 0 0 0 .39.68l5.81 3.35-2.02 1.17a.08.08 0 0 1-.07 0L3.62 14.04A4.5 4.5 0 0 1 2.34 7.9zm16.6 3.86-5.84-3.37 2.02-1.17a.08.08 0 0 1 .07 0l4.83 2.79a4.49 4.49 0 0 1-.68 8.1V12.44a.79.79 0 0 0-.4-.68zm2.01-3.02-.14-.09-4.77-2.78a.78.78 0 0 0-.79 0L9.41 9.23V6.9a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.31 12.86l-2.02-1.16a.08.08 0 0 1-.04-.06V6.07a4.5 4.5 0 0 1 7.38-3.45l-.14.08-4.78 2.76a.79.79 0 0 0-.39.68l-.01 6.72zm1.1-2.37 2.6-1.5 2.61 1.5v2.99l-2.6 1.5-2.61-1.5V10.5z"/></svg>
+          OpenAI DALL-E
+        </button>
+      </div>
+
+      <label for="i_prompt">Prompt de la imagen</label>
+      <textarea id="i_prompt" rows="5" placeholder="Ej: A dramatic cinematic portrait of a determined athlete at sunrise, ultra-realistic, 9:16 vertical format..."></textarea>
+
+      <div class="form-row" style="margin-top:16px">
+        <div class="field">
+          <label for="i_cantidad">Cantidad de imágenes</label>
+          <select id="i_cantidad">
+            <option value="1">1 imagen</option>
+            <option value="2" selected>2 imágenes</option>
+            <option value="3">3 imágenes</option>
+            <option value="4">4 imágenes</option>
+            <option value="5">5 imágenes</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="i_modelo">Modelo</label>
+          <select id="i_modelo">
+            <option value="imagen-3.0-generate-002" data-api="google">Imagen 3</option>
+            <option value="imagen-4.0-generate-preview-05-20" data-api="google">Imagen 4 (preview)</option>
+            <option value="dall-e-3" data-api="openai">DALL-E 3</option>
+            <option value="dall-e-2" data-api="openai">DALL-E 2</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-gen" id="i_btnGenerar">Generar imágenes</button>
+    </div>
+
+    <!-- Status imágenes -->
+    <div class="status" id="i_status">
+      <div class="spinner" id="i_statusSpinner"></div>
+      <span id="i_statusTexto"></span>
+    </div>
+
+    <!-- Resultado imágenes -->
+    <div class="card hidden" id="i_cardResultado">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-title" style="margin-bottom:0" id="i_resultTitulo">Imágenes generadas</div>
+        <span id="i_imgContador" style="font-size:0.82rem;color:var(--muted)"></span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="i_imgProgressBar"></div></div>
+      <div class="images-grid" id="i_imgGrid"></div>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECCIÓN 3: VIDEO
+  ════════════════════════════════════════════════════════ -->
+  <section id="video">
+    <div class="section-header">
+      <div class="section-icon">🎬</div>
+      <div>
+        <h2>Generador de Video</h2>
+        <p>Pipeline completo: Guion → Audio → Imágenes → Video → Telegram, de forma automática.</p>
+      </div>
+    </div>
+
+    <!-- Error banner -->
+    <div class="error-banner" id="v_errorBanner"></div>
+
+    <!-- Formulario video -->
+    <div class="card" id="v_cardForm">
+      <h3>Nuevo video</h3>
+      <div class="form-row">
+        <div class="field">
+          <label for="v_inputTema">Tema del video</label>
+          <textarea id="v_inputTema" placeholder="Ej: superar el miedo al fracaso, la disciplina como hábito diario..."></textarea>
+        </div>
+        <div class="field-sm">
+          <label for="v_inputModelo">Modelo de imagen</label>
+          <select id="v_inputModelo">
+            <option value="dall-e-3">DALL-E 3</option>
+            <option value="dall-e-2">DALL-E 2</option>
+            <option value="imagen-3.0-generate-002">Google Imagen 3</option>
+          </select>
+        </div>
+        <div class="field-sm">
+          <label for="v_inputCantidad">Imágenes</label>
+          <select id="v_inputCantidad">
+            <option value="1" selected>1 imagen</option>
+            <option value="2">2 imágenes</option>
+            <option value="3">3 imágenes</option>
+            <option value="4">4 imágenes</option>
+            <option value="5">5 imágenes</option>
+            <option value="6">6 imágenes</option>
+            <option value="7">7 imágenes</option>
+            <option value="8">8 imágenes</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sel-label" style="margin-top:18px">Voz del narrador</div>
+      <div class="sel-row">
+        <button class="sel-btn sel-fem" id="v_btnVozFem" onclick="vSelectVoz('femenino')">
+          <span style="font-size:1.2rem">♀</span> Femenina
+        </button>
+        <button class="sel-btn" id="v_btnVozMas" onclick="vSelectVoz('masculino')">
+          <span style="font-size:1.2rem">♂</span> Masculina
+        </button>
+      </div>
+
+      <div class="sel-label">Proveedor TTS</div>
+      <div class="sel-row">
+        <button class="sel-btn sel-google" id="v_btnTTSGoogle" onclick="vSelectTTS('google')">
+          🔵 Google TTS
+        </button>
+        <button class="sel-btn" id="v_btnTTSOpenAI" onclick="vSelectTTS('openai')">
+          🟢 OpenAI TTS
+        </button>
+      </div>
+
+      <div class="param-block">
+        <div class="param-label">Estilo visual</div>
+        <div class="chips" id="v_chipsEstilo">
+          <span class="chip active" data-valor="cinematico">🎬 Cinemático</span>
+          <span class="chip" data-valor="caricatura">🎨 Caricatura</span>
+          <span class="chip" data-valor="byn">⬛ Blanco y negro</span>
+          <span class="chip" data-valor="acuarela">🖌️ Acuarela</span>
+          <span class="chip" data-valor="minimalista">◻️ Minimalista</span>
+          <span class="chip" data-valor="cyberpunk">🌆 Cyberpunk</span>
+        </div>
+      </div>
+
+      <div class="param-block">
+        <div class="param-label">Escenario / Entorno</div>
+        <div class="chips" id="v_chipsEscenario">
+          <span class="chip active" data-valor="ninguno">✨ Sin preferencia</span>
+          <span class="chip" data-valor="ciudad">🏙️ Ciudad</span>
+          <span class="chip" data-valor="bosque">🌲 Bosque</span>
+          <span class="chip" data-valor="lago">🌊 Lago / Costa</span>
+          <span class="chip" data-valor="montana">⛰️ Montaña</span>
+          <span class="chip" data-valor="interior">🏠 Interior</span>
+          <span class="chip" data-valor="abstracto">🌀 Abstracto</span>
+        </div>
+      </div>
+
+      <button class="btn-gen" id="v_btnGenerar">Generar video</button>
+    </div>
+
+    <!-- Progreso video -->
+    <div class="card hidden" id="v_cardProgreso">
+      <h3>Progreso en tiempo real</h3>
+      <ul class="progress-list" id="v_progressList">
+        <li id="v_step-guion"><span class="step-icon">⏳</span><span>Generando guion...</span></li>
+        <li id="v_step-caption"><span class="step-icon">⏳</span><span>Generando caption...</span></li>
+        <li id="v_step-audio"><span class="step-icon">⏳</span><span>Generando audio...</span></li>
+        <li id="v_step-subtitulos"><span class="step-icon">⏳</span><span>Generando subtítulos (Whisper)...</span></li>
+        <li id="v_step-imagenes"><span class="step-icon">⏳</span><span id="v_stepImagenesLabel">Generando imágenes...</span></li>
+        <li id="v_step-video"><span class="step-icon">⏳</span><span>Renderizando video...</span></li>
+        <li id="v_step-telegram"><span class="step-icon">⏳</span><span>Enviando a Telegram...</span></li>
+      </ul>
+    </div>
+
+    <!-- Prompts imágenes (video) -->
+    <div class="card hidden" id="v_cardPrompts">
+      <h3>Prompts de imágenes</h3>
+      <div id="v_promptsList"></div>
+    </div>
+
+    <!-- Resultado video -->
+    <div class="card hidden" id="v_cardResultado">
+      <h3>Resultado</h3>
+      <div class="telegram-badge" id="v_telegramBadge">✅ Enviado a Telegram</div>
+
+      <div class="section-title">Guion final</div>
+      <div class="copy-wrapper" style="margin-bottom:16px">
+        <textarea id="v_outGuion" rows="8" readonly></textarea>
+        <button class="btn-copy" onclick="copiar('v_outGuion', this)">Copiar</button>
+      </div>
+
+      <div class="section-title">Caption</div>
+      <div class="copy-wrapper" style="margin-bottom:16px">
+        <textarea id="v_outCaption" rows="3" readonly></textarea>
+        <button class="btn-copy" onclick="copiar('v_outCaption', this)">Copiar</button>
+      </div>
+
+      <div class="section-title">Imágenes generadas</div>
+      <div class="images-grid" id="v_outImagenes"></div>
+
+      <div class="section-title" style="margin-top:20px">Audio</div>
+      <audio id="v_outAudio" controls></audio>
+
+      <div class="section-title" style="margin-top:20px">Video final</div>
+      <video id="v_outVideo" controls playsinline></video>
+      <a id="v_btnDescargar" class="btn btn-secondary" style="margin-top:12px;display:inline-flex" download>
+        Descargar video
+      </a>
+    </div>
+
+    <!-- Galería -->
+    <div class="card" id="v_cardGaleria">
+      <h3>Galería de imágenes</h3>
+      <div id="v_galeriaGrid" class="images-grid">
+        <p style="color:var(--muted);font-size:0.9rem">Aún no hay imágenes generadas.</p>
+      </div>
+    </div>
+
+    <!-- Historial -->
+    <div class="card" id="v_cardHistorial">
+      <h3>Historial</h3>
+      <div id="v_listaHistorial">
+        <p style="color:var(--muted);font-size:0.9rem">Cargando historial...</p>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /container -->
+
+<script>
+// ═══════════════════════════════════════
+// UTILIDADES COMUNES
+// ═══════════════════════════════════════
+
+function copiar(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).value).then(() => {
+    btn.textContent = 'Copiado';
+    setTimeout(() => btn.textContent = 'Copiar', 1500);
+  });
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatearFecha(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es', { day:'2-digit', month:'short', year:'numeric' }) +
+    ' ' + d.toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+}
+
+// Marcar link activo del nav al hacer scroll
+const sections = ['audio','imagenes','video'];
+const navLinks  = document.querySelectorAll('.section-links a');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 100) current = id;
+  });
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+}, { passive: true });
+
+
+// ═══════════════════════════════════════
+// SECCIÓN AUDIO
+// ═══════════════════════════════════════
+
+let aVoz = 'femenino';
+let aTTS = 'google';
+let aES  = null;
+
+function aSelectTTS(p) {
+  aTTS = p;
+  document.getElementById('a_btnGoogle').className = 'sel-btn' + (p==='google' ? ' sel-google' : '');
+  document.getElementById('a_btnOpenAI').className = 'sel-btn' + (p==='openai' ? ' sel-openai' : '');
+}
+
+function aSelectVoz(v) {
+  aVoz = v;
+  document.getElementById('a_btnFem').className = 'sel-btn' + (v==='femenino' ? ' sel-fem' : '');
+  document.getElementById('a_btnMas').className = 'sel-btn' + (v==='masculino' ? ' sel-mas' : '');
+}
+
+function aSetPaso(n, estado) {
+  const paso = document.getElementById(`a_paso${n}`);
+  const ico  = document.getElementById(`a_ico${n}`);
+  paso.className = 'step ' + estado;
+  if (estado === 'active')     ico.innerHTML = '<div class="spinner"></div>';
+  else if (estado === 'done')  ico.textContent = '✓';
+  else if (estado === 'error') ico.textContent = '✗';
+  else                         ico.textContent = '●';
+}
+
+document.getElementById('a_btnGenerar').addEventListener('click', async () => {
+  const tema = document.getElementById('a_tema').value.trim();
+  if (!tema) { alert('Escribe el tema antes de continuar.'); return; }
+
+  if (aES) { aES.close(); aES = null; }
+
+  const btn = document.getElementById('a_btnGenerar');
+  btn.disabled = true;
+  btn.textContent = 'Procesando...';
+
+  document.getElementById('a_cardResultado').classList.add('hidden');
+  document.getElementById('a_cardProgreso').classList.remove('hidden');
+  [1,2,3].forEach(n => aSetPaso(n,''));
+  aSetPaso(1,'active');
+
+  try {
+    const resp = await fetch('/util/audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tema, genero: aVoz, tts: aTTS }),
+    });
+    const { id, error } = await resp.json();
+    if (error) throw new Error(error);
+
+    aES = new EventSource(`/util/audio-progress/${id}`);
+
+    aES.addEventListener('progreso', e => {
+      const { paso } = JSON.parse(e.data);
+      if (paso > 1) aSetPaso(paso - 1, 'done');
+      aSetPaso(paso, 'active');
+    });
+
+    aES.addEventListener('guion_listo', e => {
+      document.getElementById('a_outGuion').value = JSON.parse(e.data).guion;
+    });
+
+    aES.addEventListener('audio_listo', e => {
+      document.getElementById('a_audioPlayer').src = JSON.parse(e.data).url;
+    });
+
+    aES.addEventListener('finalizado', e => {
+      const { url, guion } = JSON.parse(e.data);
+      aES.close(); aES = null;
+      [1,2,3].forEach(n => aSetPaso(n,'done'));
+      document.getElementById('a_outGuion').value = guion;
+      document.getElementById('a_audioPlayer').src = url;
+      const badge = document.getElementById('a_tgBadge');
+      badge.className = 'tg-badge';
+      badge.innerHTML = '<span>✅</span> Audio enviado a Telegram';
+      document.getElementById('a_cardResultado').classList.remove('hidden');
+      document.getElementById('a_cardResultado').scrollIntoView({ behavior: 'smooth' });
+      btn.disabled = false;
+      btn.textContent = 'Generar guion + audio → Telegram';
+    });
+
+    aES.addEventListener('error', e => {
+      let datos = {};
+      try { datos = JSON.parse(e.data || '{}'); } catch(_) {}
+      [1,2,3].forEach(n => {
+        if (document.getElementById(`a_paso${n}`).classList.contains('active')) aSetPaso(n,'error');
+      });
+      const badge = document.getElementById('a_tgBadge');
+      badge.className = 'tg-badge tg-badge-error';
+      badge.innerHTML = '<span>❌</span> ' + (datos.mensaje || 'Error desconocido');
+      document.getElementById('a_cardResultado').classList.remove('hidden');
+      if (aES) { aES.close(); aES = null; }
+      btn.disabled = false;
+      btn.textContent = 'Generar guion + audio → Telegram';
+    });
+
+  } catch (err) {
+    alert('Error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Generar guion + audio → Telegram';
+  }
+});
+
+
+// ═══════════════════════════════════════
+// SECCIÓN IMÁGENES
+// ═══════════════════════════════════════
+
+let iApi = 'google';
+let iES  = null;
+
+function iSelectApi(api) {
+  iApi = api;
+  document.getElementById('i_btnGoogle').className = 'sel-btn' + (api==='google' ? ' sel-google' : '');
+  document.getElementById('i_btnOpenAI').className = 'sel-btn' + (api==='openai' ? ' sel-openai' : '');
+  const modelo = document.getElementById('i_modelo');
+  Array.from(modelo.options).forEach(opt => { opt.hidden = opt.dataset.api !== api; });
+  const primera = Array.from(modelo.options).find(o => o.dataset.api === api);
+  if (primera) modelo.value = primera.value;
+}
+iSelectApi('google');
+
+function iSetStatus(tipo, texto) {
+  const el = document.getElementById('i_status');
+  el.className = 'status ' + tipo;
+  document.getElementById('i_statusTexto').textContent = texto;
+  document.getElementById('i_statusSpinner').style.display = tipo === 'sending' ? 'block' : 'none';
+}
+
+document.getElementById('i_btnGenerar').addEventListener('click', async () => {
+  const prompt   = document.getElementById('i_prompt').value.trim();
+  const cantidad = parseInt(document.getElementById('i_cantidad').value);
+  const modelo   = document.getElementById('i_modelo').value;
+  if (!prompt) { iSetStatus('error','Escribe el prompt antes de continuar.'); return; }
+
+  if (iES) { iES.close(); iES = null; }
+
+  const btn = document.getElementById('i_btnGenerar');
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+
+  const card = document.getElementById('i_cardResultado');
+  document.getElementById('i_imgGrid').innerHTML = '';
+  document.getElementById('i_imgProgressBar').style.width = '0%';
+  document.getElementById('i_imgContador').textContent = `0 / ${cantidad}`;
+  document.getElementById('i_resultTitulo').textContent = 'Generando...';
+  card.classList.remove('hidden');
+  card.scrollIntoView({ behavior: 'smooth' });
+  iSetStatus('sending','Iniciando generación de imágenes...');
+
+  try {
+    const resp = await fetch('/util/imagenes-directas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, cantidad, modelo, api: iApi }),
+    });
+    const { id, error } = await resp.json();
+    if (error) throw new Error(error);
+
+    iES = new EventSource(`/util/imagenes-progress/${id}`);
+
+    iES.addEventListener('progreso', e => {
+      const { mensaje } = JSON.parse(e.data);
+      document.getElementById('i_resultTitulo').textContent = mensaje;
+      iSetStatus('sending', mensaje);
+    });
+
+    iES.addEventListener('imagen_lista', e => {
+      const { n, total, urlPublica } = JSON.parse(e.data);
+      document.getElementById('i_imgContador').textContent = `${n} / ${total}`;
+      document.getElementById('i_imgProgressBar').style.width = `${(n/total)*100}%`;
+      document.getElementById('i_resultTitulo').textContent = `Imagen ${n}/${total} lista`;
+      const c = document.createElement('div');
+      c.className = 'img-card';
+      c.id = `i_img-card-${n}`;
+      c.innerHTML = `
+        <img src="${urlPublica}" alt="Imagen ${n}" />
+        <span class="img-badge" id="i_badge-${n}">Enviando...</span>
+        <a class="img-download" href="${urlPublica}" download="imagen-${n}.png" target="_blank">Guardar</a>
+      `;
+      document.getElementById('i_imgGrid').appendChild(c);
+    });
+
+    iES.addEventListener('telegram_ok', e => {
+      const { n } = JSON.parse(e.data);
+      const b = document.getElementById(`i_badge-${n}`);
+      if (b) { b.textContent = 'Enviada'; b.classList.add('ok'); }
+    });
+
+    iES.addEventListener('telegram_error', e => {
+      const { n } = JSON.parse(e.data);
+      const b = document.getElementById(`i_badge-${n}`);
+      if (b) { b.textContent = 'Error TG'; b.style.background = '#7f1d1dcc'; }
+    });
+
+    iES.addEventListener('finalizado', e => {
+      const { total } = JSON.parse(e.data);
+      iES.close(); iES = null;
+      document.getElementById('i_resultTitulo').textContent = `${total} imagen${total!==1?'es':''} generada${total!==1?'s':''}`;
+      document.getElementById('i_imgProgressBar').style.width = '100%';
+      iSetStatus('ok', `${total} imagen${total!==1?'es':''} generada${total!==1?'s':''} correctamente.`);
+      btn.disabled = false;
+      btn.textContent = 'Generar imágenes';
+    });
+
+    iES.addEventListener('error', e => {
+      let datos = {};
+      try { datos = JSON.parse(e.data || '{}'); } catch(_) {}
+      iSetStatus('error', datos.mensaje || 'Error generando imágenes.');
+      if (iES) { iES.close(); iES = null; }
+      btn.disabled = false;
+      btn.textContent = 'Generar imágenes';
+    });
+
+  } catch(err) {
+    iSetStatus('error', err.message);
+    btn.disabled = false;
+    btn.textContent = 'Generar imágenes';
+  }
+});
+
+
+// ═══════════════════════════════════════
+// SECCIÓN VIDEO
+// ═══════════════════════════════════════
+
+let vVoz = 'femenino';
+let vTTS = 'google';
+let vEstilo   = 'cinematico';
+let vEscenario = 'ninguno';
+let vES  = null;
+let vSubtitulosListos = false;
+let vImagenesListas   = false;
+
+function vCheckVideoReady() {
+  if (vSubtitulosListos && vImagenesListas) vMarcarPaso('v_step-video','active');
+}
+
+function vSelectVoz(v) {
+  vVoz = v;
+  document.getElementById('v_btnVozFem').className = 'sel-btn' + (v==='femenino' ? ' sel-fem' : '');
+  document.getElementById('v_btnVozMas').className = 'sel-btn' + (v==='masculino' ? ' sel-mas' : '');
+}
+
+function vSelectTTS(p) {
+  vTTS = p;
+  document.getElementById('v_btnTTSGoogle').className = 'sel-btn' + (p==='google' ? ' sel-google' : '');
+  document.getElementById('v_btnTTSOpenAI').className = 'sel-btn' + (p==='openai' ? ' sel-openai' : '');
+}
+
+function initChips(grupoId, onSelect) {
+  const chips = document.querySelectorAll(`#${grupoId} .chip`);
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      onSelect(chip.dataset.valor);
+    });
+  });
+}
+initChips('v_chipsEstilo',    v => { vEstilo    = v; });
+initChips('v_chipsEscenario', v => { vEscenario = v; });
+
+function vMarcarPaso(stepId, estado) {
+  const li = document.getElementById(stepId);
+  if (!li) return;
+  li.classList.remove('active','done');
+  const icon = li.querySelector('.step-icon');
+  if (estado === 'active')     { li.classList.add('active'); icon.innerHTML = '<span class="spinner"></span>'; }
+  else if (estado === 'done')  { li.classList.add('done');   icon.textContent = '✅'; }
+  else if (estado === 'error') { icon.textContent = '❌'; }
+}
+
+function vMostrarError(msg) {
+  const el = document.getElementById('v_errorBanner');
+  el.textContent = '❌ Error: ' + msg;
+  el.classList.add('visible');
+  el.scrollIntoView({ behavior: 'smooth' });
+}
+
+function vOcultarError() {
+  document.getElementById('v_errorBanner').classList.remove('visible');
+}
+
+document.getElementById('v_btnGenerar').addEventListener('click', async () => {
+  const tema     = document.getElementById('v_inputTema').value.trim();
+  const cantidad = document.getElementById('v_inputCantidad').value;
+  const modelo   = document.getElementById('v_inputModelo').value;
+  const apiMap   = { 'dall-e-3':'openai', 'dall-e-2':'openai', 'imagen-3.0-generate-002':'google' };
+  const api      = apiMap[modelo] || 'openai';
+
+  if (!tema) { vMostrarError('Escribe el tema del video antes de continuar.'); return; }
+  vOcultarError();
+
+  const btn = document.getElementById('v_btnGenerar');
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+
+  ['guion','caption','audio','subtitulos','imagenes','video','telegram'].forEach(s => {
+    const li = document.getElementById('v_step-' + s);
+    li.classList.remove('active','done');
+    li.querySelector('.step-icon').textContent = '⏳';
+  });
+  vSubtitulosListos = false;
+  vImagenesListas   = false;
+  document.getElementById('v_stepImagenesLabel').textContent = 'Generando imágenes...';
+
+  document.getElementById('v_cardProgreso').classList.remove('hidden');
+  document.getElementById('v_cardResultado').classList.add('hidden');
+  document.getElementById('v_cardPrompts').classList.add('hidden');
+  document.getElementById('v_promptsList').innerHTML = '';
+  vMarcarPaso('v_step-guion','active');
+
+  try {
+    const resp = await fetch('/generar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tema, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS, estilo: vEstilo, escenario: vEscenario }),
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || 'Error al iniciar.'); }
+    const { id } = await resp.json();
+
+    if (vES) vES.close();
+    vES = new EventSource(`/progreso/${id}`);
+
+    vES.addEventListener('guion_listo', e => {
+      vMarcarPaso('v_step-guion','done');
+      document.getElementById('v_outGuion').value = JSON.parse(e.data).guion_final;
+      vMarcarPaso('v_step-caption','active');
+      vMarcarPaso('v_step-audio','active');
+      vMarcarPaso('v_step-imagenes','active');
+    });
+
+    vES.addEventListener('prompt_imagen', e => {
+      const { n, total, prompt } = JSON.parse(e.data);
+      document.getElementById('v_cardPrompts').classList.remove('hidden');
+      const item = document.createElement('div');
+      item.className = 'prompt-item';
+      item.innerHTML = `<div class="prompt-label">Imagen ${n} / ${total}</div><div class="prompt-text">${escHtml(prompt)}</div>`;
+      document.getElementById('v_promptsList').appendChild(item);
+    });
+
+    vES.addEventListener('caption_listo', e => {
+      vMarcarPaso('v_step-caption','done');
+      document.getElementById('v_outCaption').value = JSON.parse(e.data).caption;
+    });
+
+    vES.addEventListener('audio_listo', e => {
+      vMarcarPaso('v_step-audio','done');
+      document.getElementById('v_outAudio').src = JSON.parse(e.data).ruta;
+      vMarcarPaso('v_step-subtitulos','active');
+    });
+
+    vES.addEventListener('subtitulos_listos', () => {
+      vMarcarPaso('v_step-subtitulos','done');
+      vSubtitulosListos = true;
+      vCheckVideoReady();
+    });
+
+    vES.addEventListener('imagenes_listas', e => {
+      vMarcarPaso('v_step-imagenes','done');
+      const { rutas } = JSON.parse(e.data);
+      const grid = document.getElementById('v_outImagenes');
+      grid.innerHTML = '';
+      rutas.forEach((ruta, i) => {
+        const card = document.createElement('div');
+        card.className = 'img-card';
+        const img = document.createElement('img');
+        img.src = ruta; img.alt = `Imagen ${i+1}`;
+        const a = document.createElement('a');
+        a.className = 'img-download'; a.href = ruta; a.download = `imagen-${i+1}.png`; a.textContent = '⬇';
+        card.appendChild(img); card.appendChild(a);
+        grid.appendChild(card);
+      });
+      vCargarGaleria();
+      vImagenesListas = true;
+      vCheckVideoReady();
+    });
+
+    vES.addEventListener('video_listo', e => {
+      vMarcarPaso('v_step-video','done');
+      const { ruta } = JSON.parse(e.data);
+      document.getElementById('v_outVideo').src = ruta;
+      const dl = document.getElementById('v_btnDescargar');
+      dl.href = ruta; dl.download = 'short-motivacional.mp4';
+      vMarcarPaso('v_step-telegram','active');
+    });
+
+    vES.addEventListener('telegram_listo', () => { vMarcarPaso('v_step-telegram','done'); });
+
+    vES.addEventListener('finalizado', () => {
+      vES.close();
+      document.getElementById('v_cardResultado').classList.remove('hidden');
+      document.getElementById('v_cardResultado').scrollIntoView({ behavior: 'smooth' });
+      btn.disabled = false; btn.textContent = 'Generar video';
+      vCargarHistorial();
+    });
+
+    vES.addEventListener('error_pipeline', e => {
+      const datos = JSON.parse(e.data);
+      vMostrarError(datos.mensaje || 'Error desconocido en el pipeline.');
+      vES.close(); btn.disabled = false; btn.textContent = 'Generar video';
+    });
+
+    vES.onerror = () => {};
+
+  } catch(err) {
+    vMostrarError(err.message);
+    btn.disabled = false; btn.textContent = 'Generar video';
+  }
+});
+
+// Galería
+async function vCargarGaleria() {
+  try {
+    const items = await (await fetch('/galeria')).json();
+    const grid = document.getElementById('v_galeriaGrid');
+    if (!items.length) { grid.innerHTML = '<p style="color:var(--muted);font-size:0.9rem">Aún no hay imágenes generadas.</p>'; return; }
+    grid.innerHTML = '';
+    items.slice().reverse().forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'img-card';
+      const img = document.createElement('img');
+      img.src = item.urlPublica; img.alt = item.prompt || ''; img.title = item.prompt || '';
+      const a = document.createElement('a');
+      a.className = 'img-download'; a.href = item.urlPublica; a.download = `imagen-${item.id}-${item.numero}.png`; a.textContent = '⬇';
+      card.appendChild(img); card.appendChild(a);
+      grid.appendChild(card);
+    });
+  } catch(err) { console.error('[galeria]', err); }
+}
+
+// Historial
+async function vCargarHistorial() {
+  try {
+    const historial = await (await fetch('/historial')).json();
+    vRenderHistorial(historial);
+  } catch(err) {
+    document.getElementById('v_listaHistorial').innerHTML = '<p style="color:var(--muted);font-size:0.9rem">No se pudo cargar el historial.</p>';
+  }
+}
+
+function vRenderHistorial(historial) {
+  const contenedor = document.getElementById('v_listaHistorial');
+  if (!historial.length) {
+    contenedor.innerHTML = '<p style="color:var(--muted);font-size:0.9rem">Aún no hay generaciones guardadas.</p>';
+    return;
+  }
+  contenedor.innerHTML = '';
+  historial.forEach(entrada => {
+    const thumb = entrada.rutas.imagenes?.[0] || '';
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <img class="history-thumb" src="${thumb}" onerror="this.style.background='var(--surface2)'" alt="miniatura" />
+      <div class="history-info">
+        <div class="tema">${escHtml(entrada.tema)}</div>
+        <div class="fecha">${formatearFecha(entrada.fecha)}</div>
+      </div>
+      <div class="history-actions">
+        <button class="btn btn-secondary btn-sm" onclick="vToggleDetalle('${entrada.id}')">Ver</button>
+        <button class="btn btn-secondary btn-sm" onclick="vReenviar('${entrada.id}', this)">Reenviar</button>
+      </div>
+    `;
+    const detalle = document.createElement('div');
+    detalle.className = 'detail-panel';
+    detalle.id = `v_detalle-${entrada.id}`;
+    detalle.innerHTML = `
+      <p class="section-title" style="margin-bottom:6px">Guion</p>
+      <div class="copy-wrapper" style="margin-bottom:12px">
+        <textarea rows="5" readonly style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-family:inherit;font-size:0.875rem">${escHtml(entrada.guion)}</textarea>
+        <button class="btn-copy" onclick="this.previousElementSibling.select();document.execCommand('copy');this.textContent='¡Copiado!';setTimeout(()=>this.textContent='Copiar',1500)">Copiar</button>
+      </div>
+      <p class="section-title" style="margin-bottom:6px">Caption</p>
+      <div class="copy-wrapper" style="margin-bottom:12px">
+        <textarea rows="2" readonly style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-family:inherit;font-size:0.875rem">${escHtml(entrada.caption)}</textarea>
+        <button class="btn-copy" onclick="this.previousElementSibling.select();document.execCommand('copy');this.textContent='¡Copiado!';setTimeout(()=>this.textContent='Copiar',1500)">Copiar</button>
+      </div>
+      <p class="section-title" style="margin-bottom:6px">Video</p>
+      <video src="${entrada.rutas.video}" controls style="width:100%;max-height:300px;border-radius:8px;background:var(--surface)"></video>
+      <a href="${entrada.rutas.video}" download class="btn btn-secondary btn-sm" style="margin-top:8px;display:inline-flex">Descargar video</a>
+    `;
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(item);
+    wrapper.appendChild(detalle);
+    contenedor.appendChild(wrapper);
+  });
+}
+
+function vToggleDetalle(id) {
+  const panel = document.getElementById(`v_detalle-${id}`);
+  if (panel) panel.classList.toggle('open');
+}
+
+async function vReenviar(id, btn) {
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    const resp = await fetch(`/reenviar/${id}`, { method: 'POST' });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    btn.textContent = '✅ Enviado';
+  } catch(err) {
+    vMostrarError(err.message);
+    btn.disabled = false; btn.textContent = 'Reenviar';
+  }
+}
+
+// Init
+vCargarHistorial();
+vCargarGaleria();
+</script>
+</body>
+</html>
