@@ -74,14 +74,14 @@ app.get('/progreso/:id', (req, res) => {
 // ── POST /generar — Pipeline principal ───────────────────────────────────────
 app.post('/generar', async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema, cantidad = 1, genero = 'femenino', modelo = 'dall-e-3', api = 'openai', subtitulos = false } = req.body;
+  const { tema, cantidad = 1, genero = 'femenino', modelo = 'dall-e-3', api = 'openai', subtitulos = false, tts = 'google', estilo = 'cinematico', escenario = 'ninguno' } = req.body;
 
   if (!tema || !tema.trim()) {
     return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
   }
 
   const id = uuidv4();
-  console.log(`\n[${ts()}] === NUEVA GENERACIÓN id=${id} tema="${tema}" imágenes=${cantidad} voz=${genero} modelo=${modelo} ===`);
+  console.log(`\n[${ts()}] === NUEVA GENERACIÓN id=${id} tema="${tema}" imágenes=${cantidad} voz=${genero} tts=${tts} modelo=${modelo} estilo=${estilo} escenario=${escenario} ===`);
 
   // Respuesta inmediata con el ID para que el frontend abra el SSE
   res.json({ id });
@@ -105,7 +105,7 @@ app.post('/generar', async (req, res) => {
         }),
 
         // Audio → (Subtítulos si están activados)
-        generarAudio(guion_audio, rutaAudio(id), genero).then(async () => {
+        generarAudio(guion_audio, rutaAudio(id), genero, tts).then(async () => {
           emitirEvento(id, 'audio_listo', { ruta: `/output/audios/audio-${id}.mp3` });
           if (!subtitulos) {
             emitirEvento(id, 'subtitulos_listos', {});
@@ -126,7 +126,7 @@ app.post('/generar', async (req, res) => {
         // Imágenes
         generarImagenes(guion_final, parseInt(cantidad), id, (n, prompt) => {
           emitirEvento(id, 'prompt_imagen', { n, total: parseInt(cantidad), prompt });
-        }, modelo, api).then(rutas => {
+        }, modelo, api, estilo, escenario).then(rutas => {
           const urlsImagenes = rutas.map((_, i) => `/output/imagenes/imagen-${id}-${i + 1}.png`);
           emitirEvento(id, 'imagenes_listas', { rutas: urlsImagenes });
           return rutas;
@@ -171,8 +171,10 @@ app.post('/generar', async (req, res) => {
       console.log(`[${ts()}] Pipeline: generación ${id} completada con éxito.`);
 
     } catch (err) {
-      console.error(`[${ts()}] Pipeline ERROR [${id}]:`, err.message);
-      emitirEvento(id, 'error_pipeline', { mensaje: err.message });
+      const mensaje = err?.message || String(err) || 'Error desconocido';
+      console.error(`[${ts()}] Pipeline ERROR [${id}]:`, mensaje);
+      console.error(err?.stack || err);
+      emitirEvento(id, 'error_pipeline', { mensaje });
     }
   })();
 });
@@ -279,7 +281,7 @@ app.get('/util/audio-progress/:id', (req, res) => {
 // ── POST /util/audio — Tema → Guion → Audio Google TTS → Telegram ─────────────
 app.post('/util/audio', async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema, genero = 'masculino' } = req.body;
+  const { tema, genero = 'masculino', tts = 'google' } = req.body;
   if (!tema?.trim()) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
   const id = 'audio-' + uuidv4();
@@ -298,9 +300,10 @@ app.post('/util/audio', async (req, res) => {
       emit('guion_listo', { guion: guion_final });
 
       // Paso 2: Audio
-      emit('progreso', { paso: 2, mensaje: `Generando audio (voz ${genero})...` });
+      const proveedorNombre = tts === 'openai' ? 'OpenAI TTS' : 'Google TTS';
+      emit('progreso', { paso: 2, mensaje: `Generando audio (voz ${genero}, ${proveedorNombre})...` });
       const ruta = rutaAudio(id);
-      await generarAudio(guion_audio, ruta, genero);
+      await generarAudio(guion_audio, ruta, genero, tts);
       const urlAudio = `/output/audios/audio-${id}.mp3`;
       emit('audio_listo', { url: urlAudio });
 
@@ -313,8 +316,10 @@ app.post('/util/audio', async (req, res) => {
 
       console.log(`[${ts()}] Util/audio: completado id=${id}`);
     } catch (err) {
-      console.error(`[util/audio] ERROR:`, err.message);
-      emit('error', { mensaje: err.message });
+      const mensaje = err?.message || String(err) || 'Error desconocido';
+      console.error(`[util/audio] ERROR:`, mensaje);
+      console.error(err?.stack || err);
+      emit('error', { mensaje });
     }
   })();
 });

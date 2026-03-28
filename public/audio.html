@@ -242,13 +242,25 @@
   </nav>
 
   <h1>Generador de Audio</h1>
-  <p class="subtitle">Escribe el tema, elige la voz y genera el guion + audio via Google TTS → Telegram.</p>
+  <p class="subtitle">Escribe el tema, elige la voz y genera el guion + audio → Telegram.</p>
 
   <div class="card">
     <label for="tema">Tema del guion</label>
     <textarea id="tema" rows="3" placeholder="Ej: la disciplina como habito diario..."></textarea>
 
-    <div class="voice-label" style="margin-top:20px">Voz</div>
+    <div class="voice-label" style="margin-top:20px">Proveedor TTS</div>
+    <div class="voice-selector" id="ttsSelector">
+      <button class="voice-btn" id="btnGoogle" onclick="selectTTS('google')" style="border-color:#4285f4;background:#4285f422;color:#93c5fd;">
+        <span style="font-size:1.2rem">🔵</span>
+        Google TTS
+      </button>
+      <button class="voice-btn" id="btnOpenAI" onclick="selectTTS('openai')">
+        <span style="font-size:1.2rem">🟢</span>
+        OpenAI TTS
+      </button>
+    </div>
+
+    <div class="voice-label" style="margin-top:18px">Voz</div>
     <div class="voice-selector">
       <button class="voice-btn selected-fem" id="btnFem" onclick="selectVoz('femenino')">
         <span style="font-size:1.4rem">&#9792;</span>
@@ -303,6 +315,20 @@
 
 <script>
 let vozSeleccionada = 'femenino';
+let ttsSeleccionado = 'google';
+
+function selectTTS(proveedor) {
+  ttsSeleccionado = proveedor;
+  const btnG = document.getElementById('btnGoogle');
+  const btnO = document.getElementById('btnOpenAI');
+  if (proveedor === 'google') {
+    btnG.style.cssText = 'border-color:#4285f4;background:#4285f422;color:#93c5fd;';
+    btnO.style.cssText = '';
+  } else {
+    btnO.style.cssText = 'border-color:#10a37f;background:#10a37f22;color:#6ee7b7;';
+    btnG.style.cssText = '';
+  }
+}
 
 function selectVoz(voz) {
   vozSeleccionada = voz;
@@ -358,7 +384,7 @@ document.getElementById('btnGenerar').addEventListener('click', async () => {
     const resp = await fetch('/util/audio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema, genero: vozSeleccionada }),
+      body: JSON.stringify({ tema, genero: vozSeleccionada, tts: ttsSeleccionado }),
     });
     const { id, error } = await resp.json();
     if (error) throw new Error(error);

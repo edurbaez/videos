@@ -13,23 +13,21 @@ async function obtenerTokenTTS() {
   return token;
 }
 
-// Voces disponibles por genero
-const VOCES = {
+// Voces Google TTS disponibles por genero
+const VOCES_GOOGLE = {
   masculino: 'es-US-Neural2-B',
   femenino:  'es-US-Neural2-A',
 };
 
-/**
- * Genera un archivo MP3 a partir de texto usando Google Cloud Text-to-Speech.
- *
- * @param {string} texto        - Texto a convertir en audio
- * @param {string} rutaDestino  - Ruta absoluta donde guardar el MP3
- * @param {string} [genero]     - 'masculino' | 'femenino' (default: 'masculino')
- * @returns {string} - Ruta del archivo de audio guardado
- */
-async function generarAudio(texto, rutaDestino, genero = 'masculino') {
+// Voces OpenAI TTS disponibles por genero
+const VOCES_OPENAI = {
+  masculino: 'onyx',
+  femenino:  'nova',
+};
+
+async function generarAudioGoogle(texto, rutaDestino, genero) {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const nombreVoz = VOCES[genero] || VOCES.masculino;
+  const nombreVoz = VOCES_GOOGLE[genero] || VOCES_GOOGLE.masculino;
   console.log(`[${ts()}] Audio: sintetizando con Google TTS — voz: ${nombreVoz} (${texto.length} chars)...`);
 
   // Google TTS permite máx 5000 bytes por petición
@@ -66,6 +64,58 @@ async function generarAudio(texto, rutaDestino, genero = 'masculino') {
 
   console.log(`[${ts()}] Audio: MP3 guardado en ${rutaDestino}`);
   return rutaDestino;
+}
+
+async function generarAudioOpenAI(texto, rutaDestino, genero) {
+  const ts = () => new Date().toTimeString().slice(0, 8);
+  const voz = VOCES_OPENAI[genero] || VOCES_OPENAI.masculino;
+  console.log(`[${ts()}] Audio: sintetizando con OpenAI TTS — voz: ${voz} (${texto.length} chars)...`);
+
+  let resp;
+  try {
+    resp = await axios.post(
+      'https://api.openai.com/v1/audio/speech',
+      {
+        model: 'tts-1',
+        input: texto,
+        voice: voz,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        responseType: 'arraybuffer',
+      }
+    );
+  } catch (err) {
+    const detalle = err.response?.data
+      ? Buffer.from(err.response.data).toString('utf8')
+      : err.message;
+    console.error(`[Audio] OpenAI TTS error HTTP ${err.response?.status}:`, detalle);
+    throw new Error(`OpenAI TTS HTTP ${err.response?.status}: ${detalle}`);
+  }
+
+  fs.writeFileSync(rutaDestino, Buffer.from(resp.data));
+
+  console.log(`[${ts()}] Audio: MP3 guardado en ${rutaDestino}`);
+  return rutaDestino;
+}
+
+/**
+ * Genera un archivo MP3 a partir de texto.
+ *
+ * @param {string} texto        - Texto a convertir en audio
+ * @param {string} rutaDestino  - Ruta absoluta donde guardar el MP3
+ * @param {string} [genero]     - 'masculino' | 'femenino' (default: 'masculino')
+ * @param {string} [tts]        - 'google' | 'openai' (default: 'google')
+ * @returns {string} - Ruta del archivo de audio guardado
+ */
+async function generarAudio(texto, rutaDestino, genero = 'masculino', tts = 'google') {
+  if (tts === 'openai') {
+    return generarAudioOpenAI(texto, rutaDestino, genero);
+  }
+  return generarAudioGoogle(texto, rutaDestino, genero);
 }
 
 module.exports = { generarAudio };

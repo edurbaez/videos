@@ -388,6 +388,49 @@
       background: #3b82f618;
       color: #93c5fd;
     }
+
+    /* ── Parámetros de imagen (chips) ────────────────────────────────────── */
+    .param-block {
+      margin-top: 18px;
+    }
+    .param-block + .param-block {
+      margin-top: 14px;
+    }
+    .param-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.825rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--text); }
+    .chip.active {
+      border-color: var(--accent2);
+      background: #7c3aed28;
+      color: var(--accent2);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -485,6 +528,42 @@
       <button class="voice-btn" id="btnVozMas" onclick="selectVoz('masculino')">
         <span style="font-size:1.2rem">&#9794;</span> Masculina
       </button>
+    </div>
+
+    <div class="voice-label" style="margin-top:16px">Proveedor TTS</div>
+    <div class="api-selector" id="ttsSelectorMain">
+      <button class="api-btn selected-google" id="btnTTSGoogle" onclick="selectTTS('google')">
+        🔵 Google TTS
+      </button>
+      <button class="api-btn" id="btnTTSOpenAI" onclick="selectTTS('openai')">
+        🟢 OpenAI TTS
+      </button>
+    </div>
+
+    <!-- Parámetros de imagen -->
+    <div class="param-block">
+      <div class="param-label">Estilo visual</div>
+      <div class="chips" id="chipsEstilo">
+        <span class="chip active" data-valor="cinematico">🎬 Cinemático</span>
+        <span class="chip" data-valor="caricatura">🎨 Caricatura</span>
+        <span class="chip" data-valor="byn">⬛ Blanco y negro</span>
+        <span class="chip" data-valor="acuarela">🖌️ Acuarela</span>
+        <span class="chip" data-valor="minimalista">◻️ Minimalista</span>
+        <span class="chip" data-valor="cyberpunk">🌆 Cyberpunk</span>
+      </div>
+    </div>
+
+    <div class="param-block">
+      <div class="param-label">Escenario / Entorno</div>
+      <div class="chips" id="chipsEscenario">
+        <span class="chip active" data-valor="ninguno">✨ Sin preferencia</span>
+        <span class="chip" data-valor="ciudad">🏙️ Ciudad</span>
+        <span class="chip" data-valor="bosque">🌲 Bosque</span>
+        <span class="chip" data-valor="lago">🌊 Lago / Costa</span>
+        <span class="chip" data-valor="montana">⛰️ Montaña</span>
+        <span class="chip" data-valor="interior">🏠 Interior</span>
+        <span class="chip" data-valor="abstracto">🌀 Abstracto</span>
+      </div>
     </div>
 
     <div style="margin-top:18px;display:flex;align-items:center;gap:10px;opacity:0.5;cursor:not-allowed;" title="Subtítulos en desarrollo — próximamente disponible">
@@ -651,12 +730,38 @@ function checkVideoReady() {
 // ── Voz ─────────────────────────────────────────────────────────────────────
 
 let vozSeleccionada = 'femenino';
+let ttsSeleccionado = 'google';
 
 function selectVoz(voz) {
   vozSeleccionada = voz;
   document.getElementById('btnVozFem').className = 'voice-btn' + (voz === 'femenino' ? ' selected-fem' : '');
   document.getElementById('btnVozMas').className = 'voice-btn' + (voz === 'masculino' ? ' selected-mas' : '');
 }
+
+function selectTTS(proveedor) {
+  ttsSeleccionado = proveedor;
+  document.getElementById('btnTTSGoogle').className = 'api-btn' + (proveedor === 'google' ? ' selected-google' : '');
+  document.getElementById('btnTTSOpenAI').className = 'api-btn' + (proveedor === 'openai' ? ' selected-openai' : '');
+}
+
+// ── Chips de parámetros de imagen ────────────────────────────────────────────
+
+let estiloSeleccionado  = 'cinematico';
+let escenarioSeleccionado = 'ninguno';
+
+function initChips(grupoId, onSelect) {
+  const chips = document.querySelectorAll(`#${grupoId} .chip`);
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      onSelect(chip.dataset.valor);
+    });
+  });
+}
+
+initChips('chipsEstilo',   v => { estiloSeleccionado   = v; });
+initChips('chipsEscenario', v => { escenarioSeleccionado = v; });
 
 // ── Generación ──────────────────────────────────────────────────────────────
 
@@ -705,7 +810,7 @@ document.getElementById('btnGenerar').addEventListener('click', async () => {
     const resp = await fetch('/generar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema, cantidad, genero: vozSeleccionada, modelo, api, subtitulos: false }),
+      body: JSON.stringify({ tema, cantidad, genero: vozSeleccionada, modelo, api, subtitulos: false, tts: ttsSeleccionado, estilo: estiloSeleccionado, escenario: escenarioSeleccionado }),
     });
 
     if (!resp.ok) {

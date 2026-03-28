@@ -9,6 +9,38 @@ const { rutaImagen } = require('../utils/archivos');
 // Galería en memoria: persiste mientras el servidor esté corriendo
 const galeria = [];
 
+// ── Parámetros de personalización visual ──────────────────────────────────────
+
+// Descripción en español para los logs
+const ESTILOS_ES = {
+  cinematico:  'cinematográfico ultra-realista',
+  caricatura:  'caricatura / ilustración animada',
+  byn:         'fotografía en blanco y negro de alto contraste',
+  acuarela:    'acuarela artística pintada a mano',
+  minimalista: 'diseño minimalista y limpio',
+  cyberpunk:   'cyberpunk futurista con luces de neón',
+};
+
+// Instrucción en inglés que se inyecta en el prompt de imagen
+const ESTILOS_EN = {
+  cinematico:  'cinematic ultra-realistic photography, dramatic lighting, 8K quality',
+  caricatura:  'cartoon illustration style, bold outlines, vibrant colors, animated look',
+  byn:         'black and white high-contrast photography, dramatic shadows, monochrome film look',
+  acuarela:    'watercolor painting style, soft brushstrokes, artistic, hand-painted look',
+  minimalista: 'minimalist flat design, clean composition, simple bold geometric shapes',
+  cyberpunk:   'cyberpunk style, neon lights, futuristic cityscape, sci-fi atmosphere',
+};
+
+const ESCENARIOS_EN = {
+  ninguno:   '',
+  ciudad:    'urban city environment, skyscrapers, busy streets',
+  bosque:    'lush forest environment, tall trees, natural light filtering through leaves',
+  lago:      'lakeside environment, calm water reflection, misty atmosphere',
+  montana:   'mountain summit, vast open landscape, dramatic sky',
+  interior:  'indoor setting, dramatic studio lighting, intimate atmosphere',
+  abstracto: 'abstract surreal background, conceptual visual environment',
+};
+
 /**
  * Devuelve una copia de la galería completa.
  * @returns {{ id: string, numero: number, ruta: string, urlPublica: string, prompt: string, fecha: string }[]}
@@ -25,25 +57,28 @@ function obtenerGaleria() {
  * @param {number} total  - Total de imágenes a generar
  * @returns {string} - Prompt visual en inglés
  */
-async function generarPromptVisual(guion, n, total) {
+async function generarPromptVisual(guion, n, total, estilo = 'cinematico', escenario = 'ninguno') {
+  const estiloES = ESTILOS_ES[estilo] || ESTILOS_ES.cinematico;
+  const estiloEN = ESTILOS_EN[estilo] || ESTILOS_EN.cinematico;
+  const escenarioEN = ESCENARIOS_EN[escenario] || '';
+
+  const content =
+    'Actúa como un experto en prompts visuales para videos motivacionales. ' +
+    `Escribe un prompt en inglés para generar una imagen motivacional con estilo ${estiloES}, ` +
+    'sujeto principal claro y entorno relevante al mensaje. ' +
+    'Debe ser una escena DIFERENTE y COMPLEMENTARIA a las otras escenas del video. ' +
+    `Esta es la imagen número ${n} de ${total}, así que mostrá un momento distinto ` +
+    'del viaje motivacional (por ejemplo: el dolor inicial, el punto de quiebre, ' +
+    "el esfuerzo, el triunfo). Empieza con 'Create an image of'. " +
+    `El estilo visual DEBE ser: ${estiloEN}. ` +
+    (escenarioEN ? `El entorno/ambiente DEBE incluir: ${escenarioEN}. ` : '') +
+    `Devuelve solo el prompt. Texto del guion: ${guion}`;
+
   const resp = await axios.post(
     'https://api.openai.com/v1/chat/completions',
     {
       model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'user',
-          content:
-            'Actúa como un experto en prompts visuales para videos motivacionales. ' +
-            'Escribe un prompt en inglés para generar una ilustración motivacional estilo ' +
-            'cinematográfico con sujeto principal claro y entorno relevante al mensaje. ' +
-            'Debe ser una escena DIFERENTE y COMPLEMENTARIA a las otras escenas del video. ' +
-            `Esta es la imagen número ${n} de ${total}, así que mostrá un momento distinto ` +
-            'del viaje motivacional (por ejemplo: el dolor inicial, el punto de quiebre, ' +
-            "el esfuerzo, el triunfo). Empieza con 'Create an image of'. " +
-            `Devuelve solo el prompt. Texto del guion: ${guion}`,
-        },
-      ],
+      messages: [{ role: 'user', content }],
       temperature: 0.9,
     },
     {
@@ -253,9 +288,9 @@ function crearPlaceholder(ruta) {
  * @param {string} id       - UUID de la generación
  * @returns {string[]} - Array de rutas absolutas de las imágenes generadas
  */
-async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api) {
+async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno') {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  console.log(`[${ts()}] Imagenes: generando ${cantidad} imágenes para id ${id} (api=${api} modelo=${modelo})...`);
+  console.log(`[${ts()}] Imagenes: generando ${cantidad} imágenes para id ${id} (api=${api} modelo=${modelo} estilo=${estilo} escenario=${escenario})...`);
 
   const tareas = Array.from({ length: cantidad }, (_, i) => i + 1).map(async n => {
     const ruta = rutaImagen(id, n);
@@ -264,7 +299,7 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api) {
 
     let promptVisual;
     try {
-      promptVisual = await generarPromptVisual(guion, n, cantidad);
+      promptVisual = await generarPromptVisual(guion, n, cantidad, estilo, escenario);
       if (onPrompt) onPrompt(n, promptVisual);
       console.log(`[${ts()}] Imagen ${n}/${cantidad}: prompt listo → llamando ${api}/${modelo}...`);
     } catch (err) {
@@ -309,24 +344,26 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api) {
  * Genera todos los prompts visuales en una sola llamada a GPT.
  * Devuelve un array de N strings, uno por fotograma.
  */
-async function generarTodosPrompts(guion, cantidad) {
+async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escenario = 'ninguno') {
+  const estiloEN = ESTILOS_EN[estilo] || ESTILOS_EN.cinematico;
+  const escenarioEN = ESCENARIOS_EN[escenario] || '';
+
+  const content =
+    `Actúa como experto en prompts visuales para videos motivacionales. ` +
+    `Escribe exactamente ${cantidad} prompts en inglés, uno por párrafo separado por línea en blanco. ` +
+    `Cada prompt describe una escena DIFERENTE que juntas narran el viaje motivacional: ` +
+    `dolor inicial → quiebre → esfuerzo → triunfo (adapta según cantidad). ` +
+    `Cada prompt empieza con "Create an image of". ` +
+    `El estilo visual de TODOS los prompts DEBE ser: ${estiloEN}. ` +
+    (escenarioEN ? `El entorno/ambiente de TODOS los prompts DEBE incluir: ${escenarioEN}. ` : '') +
+    `Devuelve SOLO los ${cantidad} prompts, sin numeración ni explicaciones. ` +
+    `Guion: ${guion}`;
+
   const resp = await axios.post(
     'https://api.openai.com/v1/chat/completions',
     {
       model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'user',
-          content:
-            `Actúa como experto en prompts visuales para videos motivacionales. ` +
-            `Escribe exactamente ${cantidad} prompts en inglés, uno por párrafo separado por línea en blanco. ` +
-            `Cada prompt describe una escena DIFERENTE que juntas narran el viaje motivacional: ` +
-            `dolor inicial → quiebre → esfuerzo → triunfo (adapta según cantidad). ` +
-            `Cada prompt empieza con "Create an image of". ` +
-            `Devuelve SOLO los ${cantidad} prompts, sin numeración ni explicaciones. ` +
-            `Guion: ${guion}`,
-        },
-      ],
+      messages: [{ role: 'user', content }],
       temperature: 0.9,
     },
     {
@@ -351,11 +388,11 @@ async function generarTodosPrompts(guion, cantidad) {
  * Genera imágenes una por una (secuencial).
  * Llama onCadaImagen(n, ruta, urlPublica) después de guardar cada una.
  */
-async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt) {
+async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno') {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  console.log(`[${ts()}] Imagenes: generando ${cantidad} prompts en bloque...`);
+  console.log(`[${ts()}] Imagenes: generando ${cantidad} prompts en bloque (estilo=${estilo} escenario=${escenario})...`);
 
-  const prompts = await generarTodosPrompts(guion, cantidad);
+  const prompts = await generarTodosPrompts(guion, cantidad, estilo, escenario);
   console.log(`[${ts()}] Imagenes: ${prompts.length} prompts listos. Procesando secuencialmente...`);
 
   const rutas = [];
