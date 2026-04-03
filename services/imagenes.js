@@ -5,41 +5,11 @@ const { GoogleAuth } = require('google-auth-library');
 require('dotenv').config();
 
 const { rutaImagen } = require('../utils/archivos');
+const { ESTILOS_ES, ESTILOS_EN, ESCENARIOS_EN } = require('../utils/estilos');
+const { generarStoryboard } = require('./storyboard');
 
 // Galería en memoria: persiste mientras el servidor esté corriendo
 const galeria = [];
-
-// ── Parámetros de personalización visual ──────────────────────────────────────
-
-// Descripción en español para los logs
-const ESTILOS_ES = {
-  cinematico:  'cinematográfico ultra-realista',
-  caricatura:  'caricatura / ilustración animada',
-  byn:         'fotografía en blanco y negro de alto contraste',
-  acuarela:    'acuarela artística pintada a mano',
-  minimalista: 'diseño minimalista y limpio',
-  cyberpunk:   'cyberpunk futurista con luces de neón',
-};
-
-// Instrucción en inglés que se inyecta en el prompt de imagen
-const ESTILOS_EN = {
-  cinematico:  'cinematic ultra-realistic photography, dramatic lighting, 8K quality',
-  caricatura:  'cartoon illustration style, bold outlines, vibrant colors, animated look',
-  byn:         'black and white high-contrast photography, dramatic shadows, monochrome film look',
-  acuarela:    'watercolor painting style, soft brushstrokes, artistic, hand-painted look',
-  minimalista: 'minimalist flat design, clean composition, simple bold geometric shapes',
-  cyberpunk:   'cyberpunk style, neon lights, futuristic cityscape, sci-fi atmosphere',
-};
-
-const ESCENARIOS_EN = {
-  ninguno:   '',
-  ciudad:    'urban city environment, skyscrapers, busy streets',
-  bosque:    'lush forest environment, tall trees, natural light filtering through leaves',
-  lago:      'lakeside environment, calm water reflection, misty atmosphere',
-  montana:   'mountain summit, vast open landscape, dramatic sky',
-  interior:  'indoor setting, dramatic studio lighting, intimate atmosphere',
-  abstracto: 'abstract surreal background, conceptual visual environment',
-};
 
 /**
  * Devuelve una copia de la galería completa.
@@ -214,7 +184,12 @@ async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-00
   }
 
   const b64 = resp.data.predictions?.[0]?.bytesBase64Encoded;
-  if (!b64) throw new Error('Google Imagen no devolvió imagen en la respuesta.');
+  if (!b64) {
+    const filtradas = resp.data.predictions?.length === 0 || resp.data.raiFilteredCount > 0;
+    const razon = filtradas ? 'filtro de seguridad activado' : 'sin imagen en la respuesta';
+    console.warn(`[Google Imagen] ${razon}. Respuesta: ${JSON.stringify(resp.data).slice(0, 200)}`);
+    throw new Error(`Google Imagen: ${razon}`);
+  }
   return Buffer.from(b64, 'base64');
 }
 
@@ -288,28 +263,59 @@ function crearPlaceholder(ruta) {
  * @param {string} id       - UUID de la generación
  * @returns {string[]} - Array de rutas absolutas de las imágenes generadas
  */
-async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno') {
+async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, onErrorImagen = null) {
   const ts = () => new Date().toTimeString().slice(0, 8);
   console.log(`[${ts()}] Imagenes: generando ${cantidad} imágenes para id ${id} (api=${api} modelo=${modelo} estilo=${estilo} escenario=${escenario})...`);
 
-  const tareas = Array.from({ length: cantidad }, (_, i) => i + 1).map(async n => {
+  // Generar storyboard cuando hay más de una imagen para que los prompts sean una secuencia narrativa
+  let storyboardPrompts = null;
+  if (cantidad > 1) {
+    console.log(`[${ts()}] Imagenes: generando storyboard para ${cantidad} escenas...`);
+    try {
+      const escenas = await generarStoryboard(guion, cantidad, estilo, escenario);
+      if (onStoryboard) onStoryboard(escenas);
+      storyboardPrompts = escenas.map(e => e.prompt);
+      console.log(`[${ts()}] Imagenes: storyboard listo con ${escenas.length} escenas.`);
+    } catch (err) {
+      console.warn(`[${ts()}] Imagenes: error generando storyboard (${err.message}), usando prompts individuales.`);
+    }
+  }
+
+  const rutas = [];
+
+  for (let i = 0; i < cantidad; i++) {
+    const n = i + 1;
     const ruta = rutaImagen(id, n);
     const urlPublica = `/output/imagenes/imagen-${id}-${n}.png`;
-    console.log(`[${ts()}] Imagen ${n}/${cantidad}: generando prompt visual...`);
 
     let promptVisual;
-    try {
-      promptVisual = await generarPromptVisual(guion, n, cantidad, estilo, escenario);
+    if (storyboardPrompts) {
+      promptVisual = storyboardPrompts[n - 1];
       if (onPrompt) onPrompt(n, promptVisual);
-      console.log(`[${ts()}] Imagen ${n}/${cantidad}: prompt listo → llamando ${api}/${modelo}...`);
-    } catch (err) {
-      console.error(`[${ts()}] Imagen ${n}/${cantidad}: error generando prompt: ${err.message}`);
-      crearPlaceholder(ruta);
-      galeria.push({ id, numero: n, ruta, urlPublica, prompt: null, fecha: new Date().toISOString() });
-      return ruta;
+      console.log(`[${ts()}] Imagen ${n}/${cantidad}: usando prompt de storyboard → llamando ${api}/${modelo}...`);
+    } else {
+      console.log(`[${ts()}] Imagen ${n}/${cantidad}: generando prompt visual...`);
+      try {
+        promptVisual = await generarPromptVisual(guion, n, cantidad, estilo, escenario);
+        if (onPrompt) onPrompt(n, promptVisual);
+        console.log(`[${ts()}] Imagen ${n}/${cantidad}: prompt listo → llamando ${api}/${modelo}...`);
+      } catch (err) {
+        console.error(`[${ts()}] Imagen ${n}/${cantidad}: error generando prompt: ${err.message}`);
+        crearPlaceholder(ruta);
+        galeria.push({ id, numero: n, ruta, urlPublica, prompt: null, fecha: new Date().toISOString() });
+        rutas.push(ruta);
+        continue;
+      }
+    }
+
+    // Pausa preventiva entre imágenes para Google (cuota ~2 req/min por defecto)
+    if (api === 'google' && n > 1) {
+      console.log(`[${ts()}] Imagen ${n}/${cantidad}: esperando 35s para respetar cuota de Google...`);
+      await new Promise(r => setTimeout(r, 35000));
     }
 
     let guardada = false;
+    let ultimoError = '';
     for (let intento = 1; intento <= 2; intento++) {
       try {
         let buffer;
@@ -324,18 +330,27 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
         guardada = true;
         break;
       } catch (err) {
+        ultimoError = err.message;
+        const es429 = err.message.includes('429') || err.message.includes('RESOURCE_EXHAUSTED');
+        const pausa = es429 ? 35000 : 4000;
         console.warn(`[${ts()}] Imagen ${n}/${cantidad}: intento ${intento} falló — ${err.message}`);
+        if (intento < 2) {
+          console.log(`[${ts()}] Imagen ${n}/${cantidad}: esperando ${pausa / 1000}s antes de reintentar...`);
+          await new Promise(r => setTimeout(r, pausa));
+        }
       }
     }
 
     if (!guardada) {
       console.error(`[${ts()}] Imagen ${n}/${cantidad}: usando placeholder negro.`);
       crearPlaceholder(ruta);
+      galeria.push({ id, numero: n, ruta, urlPublica, prompt: null, fecha: new Date().toISOString() });
+      if (onErrorImagen) onErrorImagen(n, ultimoError);
     }
-    return ruta;
-  });
 
-  const rutas = await Promise.all(tareas);
+    rutas.push(ruta);
+  }
+
   console.log(`[${ts()}] Imagenes: todas las imágenes generadas.`);
   return rutas;
 }
@@ -388,11 +403,25 @@ async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escen
  * Genera imágenes una por una (secuencial).
  * Llama onCadaImagen(n, ruta, urlPublica) después de guardar cada una.
  */
-async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno') {
+async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null) {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  console.log(`[${ts()}] Imagenes: generando ${cantidad} prompts en bloque (estilo=${estilo} escenario=${escenario})...`);
 
-  const prompts = await generarTodosPrompts(guion, cantidad, estilo, escenario);
+  let prompts;
+  if (cantidad > 1) {
+    console.log(`[${ts()}] Imagenes: generando storyboard para ${cantidad} escenas (estilo=${estilo} escenario=${escenario})...`);
+    try {
+      const escenas = await generarStoryboard(guion, cantidad, estilo, escenario);
+      if (onStoryboard) onStoryboard(escenas);
+      prompts = escenas.map(e => e.prompt);
+      console.log(`[${ts()}] Imagenes: storyboard listo. Procesando secuencialmente...`);
+    } catch (err) {
+      console.warn(`[${ts()}] Imagenes: error en storyboard (${err.message}), usando prompts en bloque.`);
+      prompts = await generarTodosPrompts(guion, cantidad, estilo, escenario);
+    }
+  } else {
+    console.log(`[${ts()}] Imagenes: generando 1 prompt (sin storyboard)...`);
+    prompts = await generarTodosPrompts(guion, 1, estilo, escenario);
+  }
   console.log(`[${ts()}] Imagenes: ${prompts.length} prompts listos. Procesando secuencialmente...`);
 
   const rutas = [];

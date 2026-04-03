@@ -439,6 +439,53 @@
       margin-bottom: 8px;
     }
 
+    /* ── Storyboard ── */
+    .sb-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      transition: border-color 0.3s;
+    }
+    .sb-item.generando { border-color: var(--accent2); }
+    .sb-item.lista { border-color: var(--success); }
+    .sb-item.error { border-color: #e05252; }
+    .sb-error { font-size: 0.8rem; color: #e05252; margin-top: 6px; }
+    .sb-ambiente { color: var(--text2); font-style: italic; margin-top: 2px; }
+    .sb-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .sb-num {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent2);
+      flex-shrink: 0;
+    }
+    .sb-emocion {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .sb-desc {
+      font-size: 0.9rem;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .sb-prompt {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.4;
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+      word-break: break-word;
+    }
+
     /* ── Prompt items ── */
     .prompt-item {
       background: var(--surface2);
@@ -768,7 +815,13 @@
       </ul>
     </div>
 
-    <!-- Prompts imágenes (video) -->
+    <!-- Storyboard (video) -->
+    <div class="card hidden" id="v_cardStoryboard">
+      <h3>Storyboard</h3>
+      <div id="v_storyboardList"></div>
+    </div>
+
+    <!-- Prompts imágenes (video, solo se muestra cuando no hay storyboard) -->
     <div class="card hidden" id="v_cardPrompts">
       <h3>Prompts de imágenes</h3>
       <div id="v_promptsList"></div>
@@ -1097,6 +1150,7 @@ let vTTS = 'google';
 let vEstilo   = 'cinematico';
 let vEscenario = 'ninguno';
 let vES  = null;
+let vStoryboardActivo = false;
 let vSubtitulosListos = false;
 let vImagenesListas   = false;
 
@@ -1175,8 +1229,11 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
 
   document.getElementById('v_cardProgreso').classList.remove('hidden');
   document.getElementById('v_cardResultado').classList.add('hidden');
+  document.getElementById('v_cardStoryboard').classList.add('hidden');
+  document.getElementById('v_storyboardList').innerHTML = '';
   document.getElementById('v_cardPrompts').classList.add('hidden');
   document.getElementById('v_promptsList').innerHTML = '';
+  vStoryboardActivo = false;
   vMarcarPaso('v_step-guion','active');
 
   try {
@@ -1197,15 +1254,59 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
       vMarcarPaso('v_step-caption','active');
       vMarcarPaso('v_step-audio','active');
       vMarcarPaso('v_step-imagenes','active');
+      document.getElementById('v_stepImagenesLabel').textContent = 'Generando storyboard...';
+    });
+
+    vES.addEventListener('storyboard_listo', e => {
+      const { escenas } = JSON.parse(e.data);
+      vStoryboardActivo = true;
+      document.getElementById('v_stepImagenesLabel').textContent = `Generando ${escenas.length} imágenes...`;
+
+      const list = document.getElementById('v_storyboardList');
+      list.innerHTML = '';
+      escenas.forEach(esc => {
+        const item = document.createElement('div');
+        item.className = 'sb-item';
+        item.id = `v_sb-${esc.numero}`;
+        item.innerHTML =
+          `<div class="sb-header">` +
+            `<span class="sb-num">Escena ${esc.numero}</span>` +
+            `<span class="sb-emocion">${escHtml(esc.emocion)}</span>` +
+          `</div>` +
+          `<div class="sb-desc">${escHtml(esc.sujeto || esc.descripcion || '')}</div>` +
+          `<div class="sb-desc sb-ambiente">${escHtml(esc.ambiente || '')}</div>` +
+          `<div class="sb-prompt">${escHtml(esc.prompt)}</div>`;
+        list.appendChild(item);
+      });
+      document.getElementById('v_cardStoryboard').classList.remove('hidden');
     });
 
     vES.addEventListener('prompt_imagen', e => {
       const { n, total, prompt } = JSON.parse(e.data);
-      document.getElementById('v_cardPrompts').classList.remove('hidden');
-      const item = document.createElement('div');
-      item.className = 'prompt-item';
-      item.innerHTML = `<div class="prompt-label">Imagen ${n} / ${total}</div><div class="prompt-text">${escHtml(prompt)}</div>`;
-      document.getElementById('v_promptsList').appendChild(item);
+      if (vStoryboardActivo) {
+        // Marcar la escena correspondiente como "generando"
+        const sbItem = document.getElementById(`v_sb-${n}`);
+        if (sbItem) sbItem.classList.add('generando');
+      } else {
+        document.getElementById('v_cardPrompts').classList.remove('hidden');
+        const item = document.createElement('div');
+        item.className = 'prompt-item';
+        item.innerHTML = `<div class="prompt-label">Imagen ${n} / ${total}</div><div class="prompt-text">${escHtml(prompt)}</div>`;
+        document.getElementById('v_promptsList').appendChild(item);
+      }
+    });
+
+    vES.addEventListener('error_imagen', e => {
+      const { n, mensaje } = JSON.parse(e.data);
+      const sbItem = document.getElementById(`v_sb-${n}`);
+      if (sbItem) {
+        sbItem.classList.remove('generando');
+        sbItem.classList.add('error');
+        const errDiv = document.createElement('div');
+        errDiv.className = 'sb-error';
+        errDiv.textContent = `Error: ${mensaje}`;
+        sbItem.appendChild(errDiv);
+      }
     });
 
     vES.addEventListener('caption_listo', e => {
@@ -1227,6 +1328,11 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
 
     vES.addEventListener('imagenes_listas', e => {
       vMarcarPaso('v_step-imagenes','done');
+      // Marcar todas las escenas del storyboard como listas
+      document.querySelectorAll('#v_storyboardList .sb-item').forEach(el => {
+        el.classList.remove('generando');
+        el.classList.add('lista');
+      });
       const { rutas } = JSON.parse(e.data);
       const grid = document.getElementById('v_outImagenes');
       grid.innerHTML = '';
@@ -1255,6 +1361,18 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
     });
 
     vES.addEventListener('telegram_listo', () => { vMarcarPaso('v_step-telegram','done'); });
+
+    vES.addEventListener('telegram_error_video', e => {
+      const { mensaje } = JSON.parse(e.data);
+      vMarcarPaso('v_step-telegram', 'error');
+      const paso = document.getElementById('v_step-telegram');
+      if (paso) {
+        const err = document.createElement('div');
+        err.style.cssText = 'font-size:0.8rem;color:#e05252;margin-top:4px;';
+        err.textContent = `Telegram: ${mensaje}`;
+        paso.appendChild(err);
+      }
+    });
 
     vES.addEventListener('finalizado', () => {
       vES.close();

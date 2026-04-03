@@ -126,7 +126,11 @@ app.post('/generar', async (req, res) => {
         // Imágenes
         generarImagenes(guion_final, parseInt(cantidad), id, (n, prompt) => {
           emitirEvento(id, 'prompt_imagen', { n, total: parseInt(cantidad), prompt });
-        }, modelo, api, estilo, escenario).then(rutas => {
+        }, modelo, api, estilo, escenario, (escenas) => {
+          emitirEvento(id, 'storyboard_listo', { escenas });
+        }, (n, mensaje) => {
+          emitirEvento(id, 'error_imagen', { n, mensaje });
+        }).then(rutas => {
           const urlsImagenes = rutas.map((_, i) => `/output/imagenes/imagen-${id}-${i + 1}.png`);
           emitirEvento(id, 'imagenes_listas', { rutas: urlsImagenes });
           return rutas;
@@ -140,8 +144,13 @@ app.post('/generar', async (req, res) => {
 
       // ── PASO 4: Telegram ─────────────────────────────────────────────────
       console.log(`[${ts()}] Pipeline: paso 4 — telegram`);
-      await enviarATelegram(rutaVideo(id), caption);
-      emitirEvento(id, 'telegram_listo', { ok: true });
+      try {
+        await enviarATelegram(rutaVideo(id), caption);
+        emitirEvento(id, 'telegram_listo', { ok: true });
+      } catch (errTg) {
+        console.error(`[${ts()}] Telegram ERROR [${id}]:`, errTg.message);
+        emitirEvento(id, 'telegram_error_video', { mensaje: errTg.message });
+      }
 
       // ── PASO 5: Historial ────────────────────────────────────────────────
       const cantidadNum = parseInt(cantidad);
@@ -256,6 +265,8 @@ app.post('/util/imagenes', async (req, res) => {
         }
       }, (n, prompt) => {
         emit('prompt_imagen', { n, total: cantNum, prompt });
+      }, 'cinematico', 'ninguno', (escenas) => {
+        emit('storyboard_listo', { escenas });
       });
 
       emit('finalizado', { total: cantNum });
