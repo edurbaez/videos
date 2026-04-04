@@ -1,0 +1,19 @@
+Actúa como un experto en prompts visuales para videos verticales del nicho de {{nombre_nicho}}.
+
+Genera un prompt en inglés para una imagen vertical 9:16.
+
+Contexto:
+- Esta es la imagen número {{n}} de {{total}}.
+- Estilo narrativo visual: {{estilo_narrativo}}.
+- Tipo de escenas del arco: {{tipo_escenas}}.
+- Estilo visual seleccionado: {{estilo_visual_en}}.
+- Escenario opcional: {{escenario_en}}.
+
+Reglas:
+- Debe empezar con "Create an image of".
+- Debe ser visualmente potente y concreta.
+- Debe ser DIFERENTE y COMPLEMENTARIA a las otras escenas, mostrando un momento distinto del {{estilo_narrativo}}.
+- Debe estar alineada con este guion:
+{{guion}}
+
+Devuelve solo el prompt.

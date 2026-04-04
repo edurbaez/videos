@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const { crearCarpetas, rutaAudio, rutaVideo, rutaSubtitulo } = require('./utils/archivos');
 const { leerHistorial, guardarEntrada } = require('./utils/historial');
+const { listarNichos, cargarNicho } = require('./services/nichos');
 const { generarGuion } = require('./services/guion');
 const { generarCaption } = require('./services/caption');
 const { generarAudio } = require('./services/audio');
@@ -74,14 +75,41 @@ app.get('/progreso/:id', (req, res) => {
 // ── POST /generar — Pipeline principal ───────────────────────────────────────
 app.post('/generar', async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema, cantidad = 1, genero = 'femenino', modelo = 'dall-e-3', api = 'openai', subtitulos = false, tts = 'google', estilo = 'cinematico', escenario = 'ninguno' } = req.body;
+  const {
+    tema,
+    nicho    = 'motivacion',
+    cantidad = 1,
+    genero,
+    modelo,
+    api,
+    subtitulos = false,
+    tts,
+    estilo,
+    escenario,
+  } = req.body;
 
   if (!tema || !tema.trim()) {
     return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
   }
 
+  // Cargar config del nicho — falla rápido si el nicho no existe
+  let nichoConfig;
+  try {
+    nichoConfig = cargarNicho(nicho);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+
+  // Fusionar defaults del nicho con los parámetros enviados por el usuario
+  const vozFinal      = genero   || nichoConfig.defaults.voz       || 'femenino';
+  const modeloFinal   = modelo   || nichoConfig.defaults.modeloImagen || 'dall-e-3';
+  const apiFinal      = api      || nichoConfig.defaults.apiImagen  || 'openai';
+  const ttsFinal      = tts      || nichoConfig.defaults.tts        || 'google';
+  const estiloFinal   = estilo   || nichoConfig.defaults.estilo     || 'cinematico';
+  const escenarioFinal = escenario || nichoConfig.defaults.escenario || 'ninguno';
+
   const id = uuidv4();
-  console.log(`\n[${ts()}] === NUEVA GENERACIÓN id=${id} tema="${tema}" imágenes=${cantidad} voz=${genero} tts=${tts} modelo=${modelo} estilo=${estilo} escenario=${escenario} ===`);
+  console.log(`\n[${ts()}] === NUEVA GENERACIÓN id=${id} nicho=${nicho} tema="${tema}" imágenes=${cantidad} voz=${vozFinal} tts=${ttsFinal} modelo=${modeloFinal} estilo=${estiloFinal} escenario=${escenarioFinal} ===`);
 
   // Respuesta inmediata con el ID para que el frontend abra el SSE
   res.json({ id });
@@ -91,7 +119,7 @@ app.post('/generar', async (req, res) => {
     try {
       // ── PASO 1: Guion ────────────────────────────────────────────────────
       console.log(`[${ts()}] Pipeline: paso 1 — guion`);
-      const { guion_final, guion_audio } = await generarGuion(tema, id);
+      const { guion_final, guion_audio } = await generarGuion(tema, id, nichoConfig);
       emitirEvento(id, 'guion_listo', { guion_final });
 
       // ── PASO 2: Caption + (Audio → Subtítulos) + Imágenes en paralelo ──────
@@ -99,13 +127,13 @@ app.post('/generar', async (req, res) => {
       const [caption, rutaSRT, rutasImagenes] = await Promise.all([
 
         // Caption
-        generarCaption(guion_final).then(c => {
+        generarCaption(guion_final, nichoConfig).then(c => {
           emitirEvento(id, 'caption_listo', { caption: c });
           return c;
         }),
 
         // Audio → (Subtítulos si están activados)
-        generarAudio(guion_audio, rutaAudio(id), genero, tts).then(async () => {
+        generarAudio(guion_audio, rutaAudio(id), vozFinal, ttsFinal).then(async () => {
           emitirEvento(id, 'audio_listo', { ruta: `/output/audios/audio-${id}.mp3` });
           if (!subtitulos) {
             emitirEvento(id, 'subtitulos_listos', {});
@@ -126,11 +154,11 @@ app.post('/generar', async (req, res) => {
         // Imágenes
         generarImagenes(guion_final, parseInt(cantidad), id, (n, prompt) => {
           emitirEvento(id, 'prompt_imagen', { n, total: parseInt(cantidad), prompt });
-        }, modelo, api, estilo, escenario, (escenas) => {
+        }, modeloFinal, apiFinal, estiloFinal, escenarioFinal, (escenas) => {
           emitirEvento(id, 'storyboard_listo', { escenas });
         }, (n, mensaje) => {
           emitirEvento(id, 'error_imagen', { n, mensaje });
-        }).then(rutas => {
+        }, nichoConfig).then(rutas => {
           const urlsImagenes = rutas.map((_, i) => `/output/imagenes/imagen-${id}-${i + 1}.png`);
           emitirEvento(id, 'imagenes_listas', { rutas: urlsImagenes });
           return rutas;
@@ -157,9 +185,20 @@ app.post('/generar', async (req, res) => {
       guardarEntrada({
         id,
         tema,
+        nicho,
+        nombreNicho: nichoConfig.nombre,
         caption,
         guion: guion_final,
         fecha: new Date().toISOString(),
+        parametros: {
+          voz:      vozFinal,
+          tts:      ttsFinal,
+          modelo:   modeloFinal,
+          api:      apiFinal,
+          estilo:   estiloFinal,
+          escenario: escenarioFinal,
+          cantidad: cantidadNum,
+        },
         rutas: {
           audio: `/output/audios/audio-${id}.mp3`,
           imagenes: Array.from({ length: cantidadNum }, (_, i) => `/output/imagenes/imagen-${id}-${i + 1}.png`),
@@ -186,6 +225,11 @@ app.post('/generar', async (req, res) => {
       emitirEvento(id, 'error_pipeline', { mensaje });
     }
   })();
+});
+
+// ── GET /nichos ────────────────────────────────────────────────────────────
+app.get('/nichos', (req, res) => {
+  res.json(listarNichos());
 });
 
 // ── GET /historial ─────────────────────────────────────────────────────────

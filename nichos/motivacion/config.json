@@ -1,0 +1,31 @@
+{
+  "id": "motivacion",
+  "nombre": "Motivación",
+  "descripcion": "Shorts de motivación, disciplina y crecimiento personal",
+  "idioma": "es",
+  "defaults": {
+    "voz": "femenino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 120,
+    "tono": "intenso, humano, inspirador, directo",
+    "estructura": "hook fuerte, dolor, verdad incómoda, cambio de perspectiva, cierre poderoso"
+  },
+  "caption": {
+    "estilo": "breve, impactante, viral",
+    "ctaDefault": "Sígueme para más motivación diaria",
+    "hashtagsBase": ["#motivacion", "#disciplina", "#exito"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "viaje emocional",
+    "arcoNarrativo": "dolor inicial, punto de quiebre, esfuerzo, triunfo",
+    "tipoEscenas": "dolor, quiebre, esfuerzo, victoria",
+    "requiereStoryboard": true
+  }
+}

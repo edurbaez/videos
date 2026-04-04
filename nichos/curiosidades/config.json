@@ -1,0 +1,31 @@
+{
+  "id": "curiosidades",
+  "nombre": "Curiosidades",
+  "descripcion": "Shorts de datos curiosos, historia y hechos sorprendentes",
+  "idioma": "es",
+  "defaults": {
+    "voz": "masculino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 110,
+    "tono": "claro, sorprendente, dinámico, divulgativo",
+    "estructura": "hook de sorpresa, dato principal, contexto breve, remate memorable"
+  },
+  "caption": {
+    "estilo": "curioso, compartible, directo",
+    "ctaDefault": "Sígueme para más curiosidades increíbles",
+    "hashtagsBase": ["#curiosidades", "#sabiasque", "#datoscuriosos"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "secuencia explicativa",
+    "arcoNarrativo": "objeto o hecho central, contexto histórico, detalle clave, remate visual",
+    "tipoEscenas": "presentación, contexto, detalle, conclusión",
+    "requiereStoryboard": true
+  }
+}

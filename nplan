@@ -1,0 +1,1242 @@
+Sí. Viendo tu código real, te presento un **plan detallado de modificaciones** para convertirlo en **multi-nicho** sin romper la lógica actual.
+
+Voy a enfocarlo como una **refactorización por capas**, no como una reescritura.
+
+---
+
+# Plan detallado para incorporar varios nichos
+
+## Objetivo
+
+Pasar de una app diseñada para:
+- **un solo tipo de canal** (motivacional)
+
+a una app que soporte:
+- **varios nichos**
+- con **prompts, tono, voz, estilo y metadatos cargados bajo demanda**
+- reutilizando el mismo motor de:
+  - guion
+  - caption
+  - audio
+  - imágenes
+  - vídeo
+  - historial
+  - Telegram
+
+---
+
+# Diagnóstico rápido del estado actual
+
+Tu proyecto ahora mismo tiene el nicho motivacional **acoplado dentro de la lógica** en varios puntos:
+
+## Acoplamientos claros
+### `services/guion.js`
+Está totalmente orientado a motivación:
+- coach motivacional
+- influencers concretos
+- copywriter de Shorts motivacionales
+- estructura dolor → verdad incómoda → cambio → impulso final
+
+### `services/caption.js`
+También está genérico tirando a Shorts, pero sigue sin parametrización por nicho.
+
+### `services/imagenes.js`
+Aquí hay varias referencias a:
+- “videos motivacionales”
+- “imagen motivacional”
+- “viaje motivacional”
+
+Y además los prompts visuales están pensados con esa narrativa.
+
+### `public/creacion_de_contenido.html`
+El formulario de vídeo no conoce el concepto de:
+- nicho
+- perfil
+- canal
+
+Solo conoce:
+- tema
+- voz
+- TTS
+- estilo
+- escenario
+- cantidad
+- modelo
+
+### `historial.json`
+Guarda:
+- tema
+- caption
+- guion
+- rutas
+- fecha
+
+Pero no guarda:
+- nicho
+- perfil
+- configuración usada
+
+---
+
+# Estrategia general
+
+La estrategia correcta es:
+
+## 1. Crear una capa nueva de “perfil de nicho”
+Esta capa será la responsable de definir:
+- prompts base
+- tono
+- estructura narrativa
+- CTA
+- hashtags
+- voz por defecto
+- estilo visual por defecto
+- escenario por defecto
+- idioma
+- duración objetivo
+- cualquier instrucción adicional
+
+## 2. Hacer que los servicios reciban esa config
+En lugar de que `guion.js`, `caption.js` e `imagenes.js` “asuman motivación”.
+
+## 3. Mantener el pipeline actual casi intacto
+El flujo de `server.js` puede seguir siendo básicamente:
+- guion
+- caption
+- audio
+- imágenes
+- vídeo
+- telegram
+- historial
+
+Solo que antes del paso 1 se carga el perfil del nicho.
+
+---
+
+# Fase 1 — Crear la capa de nichos
+
+## Objetivo
+Introducir una estructura de configuración externa.
+
+## Cambios a hacer
+
+### 1. Crear carpeta nueva
+Propuesta:
+
+```txt
+/videos
+  /nichos
+    /motivacion
+      config.json
+      prompt-guion-borrador.txt
+      prompt-guion-mejora.txt
+      prompt-caption.txt
+      prompt-imagenes.txt
+      prompt-storyboard.txt
+    /curiosidades
+      config.json
+      prompt-guion-borrador.txt
+      prompt-guion-mejora.txt
+      prompt-caption.txt
+      prompt-imagenes.txt
+      prompt-storyboard.txt
+    /misterio
+      ...
+```
+
+## Por qué así y no un solo JSON gigante
+Porque te permite:
+- editar prompts sin tocar JS
+- probar nichos nuevos rápido
+- mantener orden
+- versionar cada nicho mejor
+
+---
+
+### 2. Crear un loader central de nichos
+Nuevo archivo sugerido:
+
+```txt
+/services/nichos.js
+```
+
+Responsabilidades:
+- listar nichos disponibles
+- cargar un nicho por `id`
+- validar que exista
+- aplicar valores por defecto
+- devolver un objeto ya listo para usar
+
+Ejemplo conceptual de salida:
+
+```js
+{
+  id: 'motivacion',
+  nombre: 'Motivación',
+  idioma: 'es',
+  vozDefault: 'femenino',
+  ttsDefault: 'google',
+  estiloDefault: 'cinematico',
+  escenarioDefault: 'ninguno',
+  narrativa: {
+    tipo: 'emocional',
+    hook: 'agresivo',
+    cierre: 'cta'
+  },
+  prompts: {
+    guionBorrador: '...',
+    guionMejora: '...',
+    caption: '...',
+    imagenes: '...',
+    storyboard: '...'
+  }
+}
+```
+
+---
+
+### 3. Definir un formato estándar para `config.json`
+Ejemplo recomendable:
+
+```json
+{
+  "id": "motivacion",
+  "nombre": "Motivación",
+  "idioma": "es",
+  "descripcion": "Shorts de motivación y crecimiento personal",
+  "defaults": {
+    "voz": "femenino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3
+  },
+  "guion": {
+    "palabrasObjetivo": 120,
+    "estructura": "hook, desarrollo, cierre",
+    "tono": "intenso, inspirador, directo"
+  },
+  "caption": {
+    "hashtagsBase": ["#motivacion", "#disciplina", "#exito"],
+    "ctaDefault": "Sígueme para más motivación diaria"
+  },
+  "imagenes": {
+    "tipoNarrativaVisual": "viaje emocional",
+    "requiereStoryboard": true
+  }
+}
+```
+
+---
+
+# Fase 2 — Adaptar el backend principal (`server.js`)
+
+## Objetivo
+Hacer que el pipeline reciba `nicho` y cargue su configuración antes de generar.
+
+## Cambios a hacer
+
+### 1. Añadir `nicho` al body de `/generar`
+Ahora mismo recibes:
+
+```js
+const { tema, cantidad, genero, modelo, api, subtitulos, tts, estilo, escenario } = req.body;
+```
+
+Debería pasar a algo como:
+```js
+const { tema, nicho = 'motivacion', cantidad, genero, modelo, api, subtitulos, tts, estilo, escenario } = req.body;
+```
+
+---
+
+### 2. Cargar config de nicho al inicio del pipeline
+Antes del paso de guion:
+- cargar `configNicho`
+- si no existe, devolver error 400
+- si existe, fusionar defaults con los parámetros enviados
+
+Ejemplo conceptual:
+- si no se manda `genero`, usar `configNicho.defaults.voz`
+- si no se manda `estilo`, usar `configNicho.defaults.estilo`
+
+---
+
+### 3. Pasar `configNicho` a todos los servicios relevantes
+Cambiar firmas de funciones:
+
+#### Antes
+```js
+generarGuion(tema, id)
+generarCaption(guion_final)
+generarImagenes(guion_final, cantidad, id, ...)
+```
+
+#### Después
+```js
+generarGuion(tema, id, configNicho)
+generarCaption(guion_final, configNicho)
+generarImagenes(guion_final, cantidad, id, ..., configNicho)
+```
+
+---
+
+### 4. Guardar el `nicho` en historial
+En `guardarEntrada` deberías guardar:
+- `nicho`
+- opcionalmente `nombreNicho`
+- y quizá algunos parámetros efectivos:
+  - voz
+  - tts
+  - estilo
+  - modelo
+  - api
+
+Esto luego te servirá para:
+- filtrar historial por nicho
+- replicar una generación
+- ver qué configuraciones funcionan mejor
+
+---
+
+### 5. Mantener compatibilidad con el flujo actual
+Si no se manda `nicho`, usar:
+```js
+'motivacion'
+```
+
+Eso hace que todo siga funcionando aunque el frontend aún no esté actualizado.
+
+---
+
+# Fase 3 — Refactor de `services/guion.js`
+
+## Objetivo
+Desacoplar el guion del nicho motivacional.
+
+## Estado actual
+Aquí está el mayor acoplamiento.
+
+Tienes dos prompts hardcodeados:
+- borrador motivacional
+- mejora viral motivacional
+
+## Cambios a hacer
+
+### 1. Convertir `generarGuion` en una función parametrizada por nicho
+Nueva firma:
+
+```js
+async function generarGuion(tema, id, nichoConfig)
+```
+
+---
+
+### 2. Sacar los prompts al nicho
+Ahora mismo el texto del prompt está incrustado en JS.
+
+Eso debe salir de aquí y venir desde:
+- `prompt-guion-borrador.txt`
+- `prompt-guion-mejora.txt`
+
+---
+
+### 3. Usar placeholders en prompts
+Ejemplo:
+```txt
+Eres un experto creador de guiones del nicho {{nombre_nicho}}.
+Tono: {{tono}}.
+Escribe un guion de {{palabras_objetivo}} palabras sobre: {{tema}}.
+```
+
+Y en JS haces un render simple:
+- `{{tema}}`
+- `{{tono}}`
+- `{{palabras_objetivo}}`
+- `{{idioma}}`
+- etc.
+
+---
+
+### 4. Mantener la estructura de dos pasos
+Eso está bien y no lo tocaría:
+- paso 1: borrador
+- paso 2: mejora
+
+Solo que el comportamiento ya no lo decide el JS fijo, sino el perfil cargado.
+
+---
+
+### 5. Mantener guardado del guion en disco
+Esto no necesita cambios estructurales.
+
+---
+
+# Fase 4 — Refactor de `services/caption.js`
+
+## Objetivo
+Generar captions distintos por nicho.
+
+## Cambios a hacer
+
+### 1. Nueva firma
+```js
+generarCaption(guion, nichoConfig)
+```
+
+### 2. Sacar prompt a archivo externo
+Crear:
+```txt
+nichos/<id>/prompt-caption.txt
+```
+
+### 3. Inyectar datos del nicho
+Por ejemplo:
+- estilo de copy
+- CTA
+- hashtags base
+- tono
+- audiencia
+
+### 4. Mejorar salida estructurada si quieres
+Opción interesante:
+hacer que internamente genere:
+- caption
+- hashtags
+- título opcional
+
+Aunque al principio no es obligatorio.
+
+---
+
+# Fase 5 — Refactor de `services/imagenes.js`
+
+## Objetivo
+Generalizar la generación visual para que no dependa del relato motivacional.
+
+## Estado actual
+Aquí hay varias referencias explícitas a:
+- “videos motivacionales”
+- “imagen motivacional”
+- “viaje motivacional”
+
+## Cambios a hacer
+
+### 1. Parametrizar `generarPromptVisual`
+Nueva firma conceptual:
+```js
+generarPromptVisual(guion, n, total, estilo, escenario, nichoConfig)
+```
+
+---
+
+### 2. Reemplazar el lenguaje hardcodeado del prompt
+Ahora mismo el prompt asume:
+- viaje motivacional
+- dolor → quiebre → esfuerzo → triunfo
+
+Eso debería venir del nicho.
+
+Por ejemplo:
+- motivación → arco emocional
+- curiosidades → progresión informativa
+- misterio → tensión creciente
+- noticias → secuencia explicativa
+- filosofía → escenas contemplativas
+
+---
+
+### 3. Adaptar también `generarTodosPrompts`
+Ese método también está sesgado a motivación.
+Debe usar:
+- prompt externo del nicho
+- o una plantilla basada en config
+
+---
+
+### 4. Adaptar `storyboard.js`
+Muy importante.
+
+Si `storyboard.js` también tiene narrativa motivacional embebida, habrá que parametrizarlo igual.
+
+Debería recibir:
+```js
+generarStoryboard(guion, cantidad, estilo, escenario, nichoConfig)
+```
+
+Y usar un prompt específico por nicho.
+
+---
+
+### 5. Mantener intacta la parte técnica
+No tocaría:
+- llamadas a DALL-E / Imagen
+- reintentos
+- placeholders
+- galería
+- guardado de archivos
+
+Eso ya es motor técnico y no depende del nicho.
+
+---
+
+# Fase 6 — Audio: parametrización ligera
+
+## Objetivo
+Prepararlo para nichos, aunque aquí el cambio es menor.
+
+## Estado actual
+`audio.js` está menos acoplado.
+
+## Cambios opcionales pero recomendables
+
+### 1. Añadir defaults por nicho
+Aunque el usuario pueda elegir voz/TTS manualmente, el nicho debería proponer:
+- voz por defecto
+- proveedor TTS por defecto
+
+### 2. Futuro: distintas voces por nicho
+Ejemplos:
+- motivación → femenina intensa
+- curiosidades → masculina clara
+- misterio → voz más grave
+- noticias → más neutra
+
+### 3. No es prioritario cambiar la lógica interna
+Aquí basta con:
+- usar defaults del nicho
+- seguir permitiendo override del usuario
+
+---
+
+# Fase 7 — Historial y metadatos
+
+## Objetivo
+Que el sistema recuerde con qué nicho se generó cada contenido.
+
+## Cambios a hacer
+
+### 1. Extender estructura de `guardarEntrada`
+Ahora guardas:
+- id
+- tema
+- caption
+- guion
+- fecha
+- rutas
+
+Deberías añadir:
+```json
+{
+  "nicho": "motivacion",
+  "nombreNicho": "Motivación",
+  "parametros": {
+    "voz": "femenino",
+    "tts": "google",
+    "modelo": "dall-e-3",
+    "api": "openai",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidad": 3
+  }
+}
+```
+
+---
+
+### 2. Mostrar nicho en la UI del historial
+Esto ayuda a:
+- entender qué se generó
+- comparar formatos
+- reusar configuraciones
+
+---
+
+### 3. Mantener compatibilidad hacia atrás
+Si hay entradas antiguas sin `nicho`, mostrar:
+- “Motivación” por defecto
+o
+- “Sin clasificar”
+
+---
+
+# Fase 8 — Frontend (`public/creacion_de_contenido.html`)
+
+## Objetivo
+Permitir seleccionar nicho sin romper la experiencia actual.
+
+## Cambios a hacer
+
+### 1. Añadir selector de nicho en la sección de vídeo
+En “Nuevo video”, encima o debajo de “Tema del video”:
+- selector `Nicho`
+- con opciones cargadas del backend
+
+Ejemplo:
+- Motivación
+- Curiosidades
+- Misterio
+- IA / Tecnología
+
+---
+
+### 2. Crear endpoint backend para listar nichos
+Nuevo endpoint:
+```js
+GET /nichos
+```
+
+Respuesta:
+```json
+[
+  { "id": "motivacion", "nombre": "Motivación" },
+  { "id": "curiosidades", "nombre": "Curiosidades" }
+]
+```
+
+---
+
+### 3. Cargar nichos al iniciar la página
+En JS del frontend:
+- pedir `/nichos`
+- llenar el select
+- marcar `motivacion` por defecto
+
+---
+
+### 4. Enviar `nicho` en el `POST /generar`
+Ahora mandas:
+```js
+{ tema, cantidad, genero, modelo, api, subtitulos, tts, estilo, escenario }
+```
+
+Debería pasar a:
+```js
+{ tema, nicho, cantidad, genero, modelo, api, subtitulos, tts, estilo, escenario }
+```
+
+---
+Vale. Sigo con la parte más útil: **bajarlo a estructura concreta**, para que no se quede en “idea bonita”.
+
+Te voy a dejar:
+- estructura exacta de carpetas
+- formato de config
+- cómo fluirían los datos
+- qué firmas cambiar
+- y un ejemplo real para `motivacion` y `curiosidades`
+
+---
+
+# 1. Estructura exacta propuesta
+
+Yo dejaría el proyecto así:
+
+```txt
+C:\Users\edurb\Desktop\videos
+│
+├─ server.js
+├─ package.json
+├─ historial.json
+├─ README.md
+│
+├─ nichos/
+│  ├─ motivacion/
+│  │  ├─ config.json
+│  │  ├─ prompt-guion-borrador.txt
+│  │  ├─ prompt-guion-mejora.txt
+│  │  ├─ prompt-caption.txt
+│  │  ├─ prompt-imagenes.txt
+│  │  └─ prompt-storyboard.txt
+│  │
+│  ├─ curiosidades/
+│  │  ├─ config.json
+│  │  ├─ prompt-guion-borrador.txt
+│  │  ├─ prompt-guion-mejora.txt
+│  │  ├─ prompt-caption.txt
+│  │  ├─ prompt-imagenes.txt
+│  │  └─ prompt-storyboard.txt
+│  │
+│  └─ misterio/
+│     ├─ config.json
+│     ├─ prompt-guion-borrador.txt
+│     ├─ prompt-guion-mejora.txt
+│     ├─ prompt-caption.txt
+│     ├─ prompt-imagenes.txt
+│     └─ prompt-storyboard.txt
+│
+├─ services/
+│  ├─ audio.js
+│  ├─ caption.js
+│  ├─ guion.js
+│  ├─ imagenes.js
+│  ├─ storyboard.js
+│  ├─ subtitulos.js
+│  ├─ telegram.js
+│  ├─ video.js
+│  └─ nichos.js
+│
+├─ utils/
+│  ├─ archivos.js
+│  ├─ estilos.js
+│  ├─ historial.js
+│  └─ prompts.js
+│
+├─ public/
+│  ├─ creacion_de_contenido.html
+│  ├─ ...
+│
+└─ output/
+```
+
+---
+
+# 2. Responsabilidad de cada pieza nueva
+
+## `services/nichos.js`
+Será el **loader/orquestador de nichos**.
+
+Responsabilidades:
+- listar nichos disponibles
+- cargar uno por `id`
+- leer `config.json`
+- leer prompts `.txt`
+- devolver un objeto ya montado
+- validar y aplicar defaults
+
+---
+
+## `utils/prompts.js`
+Utilidad simple para:
+- cargar texto
+- sustituir placeholders tipo `{{tema}}`, `{{tono}}`, `{{idioma}}`
+
+No hace falta meter plantating complejo. Con reemplazo básico basta.
+
+---
+
+# 3. Formato recomendado de `config.json`
+
+## A. `motivacion/config.json`
+
+```json
+{
+  "id": "motivacion",
+  "nombre": "Motivación",
+  "descripcion": "Shorts de motivación, disciplina y crecimiento personal",
+  "idioma": "es",
+  "defaults": {
+    "voz": "femenino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 120,
+    "tono": "intenso, humano, inspirador, directo",
+    "estructura": "hook fuerte, dolor, verdad incómoda, cambio de perspectiva, cierre poderoso"
+  },
+  "caption": {
+    "estilo": "breve, impactante, viral",
+    "ctaDefault": "Sígueme para más motivación diaria",
+    "hashtagsBase": ["#motivacion", "#disciplina", "#exito"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "viaje emocional",
+    "requiereStoryboard": true,
+    "tipoEscenas": "dolor, quiebre, esfuerzo, victoria"
+  }
+}
+```
+
+---
+
+## B. `curiosidades/config.json`
+
+```json
+{
+  "id": "curiosidades",
+  "nombre": "Curiosidades",
+  "descripcion": "Shorts de datos curiosos, historia y hechos sorprendentes",
+  "idioma": "es",
+  "defaults": {
+    "voz": "masculino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 110,
+    "tono": "claro, sorprendente, dinámico, divulgativo",
+    "estructura": "hook de sorpresa, dato principal, contexto breve, remate memorable"
+  },
+  "caption": {
+    "estilo": "curioso, compartible, directo",
+    "ctaDefault": "Sígueme para más curiosidades increíbles",
+    "hashtagsBase": ["#curiosidades", "#sabiasque", "#datoscuriosos"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "secuencia explicativa",
+    "requiereStoryboard": true,
+    "tipoEscenas": "objeto, contexto histórico, detalle clave, remate visual"
+  }
+}
+```
+
+---
+
+# 4. Formato de prompts por nicho
+
+La clave es usar **placeholders simples**.
+
+---
+
+## A. `prompt-guion-borrador.txt` para motivación
+
+```txt
+Eres un creador experto de guiones para YouTube Shorts del nicho {{nombre_nicho}}.
+
+Tu tono debe ser: {{tono}}.
+Idioma: {{idioma}}.
+Longitud objetivo: {{palabras_objetivo}} palabras.
+
+Escribe un guion breve sobre el tema: {{tema}}.
+
+Reglas:
+- Debe sonar natural y humano.
+- Debe empezar con una frase que atrape de inmediato.
+- Cada oración debe ir en una línea separada.
+- Debe poder narrarse directamente en voz en off.
+- Sigue esta estructura: {{estructura}}.
+
+Devuelve solo el guion final.
+```
+
+---
+
+## B. `prompt-guion-mejora.txt` para motivación
+
+```txt
+Eres un copywriter senior especializado en YouTube Shorts del nicho {{nombre_nicho}}.
+
+Reescribe y mejora este guion para que tenga más impacto, más retención y más fuerza emocional.
+
+Reglas:
+- Primera línea: hook brutal que detenga el scroll.
+- Frases cortas, memorables y directas.
+- Elimina relleno.
+- Mantén el tono: {{tono}}.
+- Respeta la estructura: {{estructura}}.
+- Cada oración en una línea separada.
+- Devuelve únicamente la versión final.
+
+Guion original:
+{{borrador}}
+```
+
+---
+
+## C. `prompt-caption.txt` para motivación
+
+```txt
+Actúa como un experto en copy para YouTube Shorts del nicho {{nombre_nicho}}.
+
+Crea un caption breve, potente y listo para copiar/pegar a partir de este guion:
+
+{{guion}}
+
+Reglas:
+- Tono: {{caption_estilo}}.
+- Incluye un CTA natural si encaja.
+- Usa como base estos hashtags: {{hashtags_base}}.
+- No expliques nada.
+- Devuelve solo el caption final.
+```
+
+---
+
+## D. `prompt-imagenes.txt` para motivación
+
+```txt
+Actúa como un experto en prompts visuales para videos verticales del nicho {{nombre_nicho}}.
+
+Genera un prompt en inglés para una imagen vertical 9:16.
+
+Contexto:
+- Esta es la imagen número {{n}} de {{total}}.
+- Tema narrativo visual: {{estilo_narrativo}}.
+- Tipo de escenas esperado: {{tipo_escenas}}.
+- Estilo visual seleccionado: {{estilo_visual_en}}.
+- Escenario opcional: {{escenario_en}}.
+
+Reglas:
+- Debe empezar con "Create an image of".
+- Debe ser visualmente potente y concreta.
+- Debe complementar las otras escenas, no repetirlas.
+- Debe estar alineada con este guion:
+{{guion}}
+
+Devuelve solo el prompt.
+```
+
+---
+
+## E. `prompt-storyboard.txt` para motivación
+
+```txt
+Actúa como un director creativo experto en videos verticales del nicho {{nombre_nicho}}.
+
+A partir del siguiente guion, crea un storyboard de {{cantidad}} escenas.
+
+Guion:
+{{guion}}
+
+Contexto:
+- Estilo narrativo visual: {{estilo_narrativo}}
+- Tipo de escenas esperado: {{tipo_escenas}}
+- Estilo visual: {{estilo_visual_en}}
+- Escenario: {{escenario_en}}
+
+Para cada escena devuelve:
+- numero
+- emocion
+- descripcion
+- ambiente
+- prompt
+
+Los prompts deben estar en inglés y empezar con "Create an image of".
+
+Devuelve el resultado en JSON válido.
+```
+
+---
+
+## F. Ejemplo equivalente para curiosidades
+La estructura es la misma, pero el contenido cambia:
+- ya no hablas de emoción ni superación
+- hablas de sorpresa, información, contexto, remate
+
+Eso es justo lo que te da el cambio de nicho.
+
+---
+
+# 5. Cómo debería ser `services/nichos.js`
+
+Este archivo debería hacer algo así:
+
+## Responsabilidades
+- buscar carpetas dentro de `nichos/`
+- leer cada `config.json`
+- cargar prompts
+- devolver objeto final
+
+## Interfaz recomendada
+
+```js
+listarNichos()
+cargarNicho(id)
+```
+
+## Resultado esperado de `cargarNicho('motivacion')`
+Algo así:
+
+```js
+{
+  id: 'motivacion',
+  nombre: 'Motivación',
+  descripcion: '...',
+  idioma: 'es',
+  defaults: {...},
+  guion: {...},
+  caption: {...},
+  imagenes: {...},
+  prompts: {
+    guionBorrador: '...',
+    guionMejora: '...',
+    caption: '...',
+    imagenes: '...',
+    storyboard: '...'
+  }
+}
+```
+
+---
+
+# 6. Cómo debería ser `utils/prompts.js`
+
+Una utilidad tonta y útil.
+
+## Funciones recomendadas
+
+```js
+renderPrompt(template, vars)
+```
+
+Y quizá:
+```js
+joinHashtags(array)
+```
+
+## Comportamiento
+Reemplazar:
+- `{{tema}}`
+- `{{idioma}}`
+- `{{tono}}`
+- `{{borrador}}`
+- etc.
+
+No necesitas Handlebars ni nada raro.
+
+---
+
+# 7. Flujo de datos nuevo
+
+## Flujo general
+
+### Antes
+`frontend -> /generar -> guion -> caption/audio/imagenes -> video -> telegram`
+
+### Después
+`frontend -> /generar + nicho -> cargarNicho() -> guion/caption/audio/imagenes con config -> video -> telegram`
+
+---
+
+## Flujo detallado
+### 1. Frontend manda:
+```json
+{
+  "tema": "inventos raros que cambiaron el mundo",
+  "nicho": "curiosidades",
+  "cantidad": 3,
+  "genero": "masculino",
+  "tts": "google",
+  "modelo": "dall-e-3",
+  "api": "openai",
+  "estilo": "cinematico",
+  "escenario": "ninguno"
+}
+```
+
+### 2. `server.js`
+- carga `cargarNicho('curiosidades')`
+- mezcla defaults del nicho con overrides del request
+
+### 3. `guion.js`
+- recibe `tema`, `id`, `nichoConfig`
+- usa prompts de curiosidades
+
+### 4. `caption.js`
+- usa prompt de curiosidades
+
+### 5. `imagenes.js`
+- usa prompt/storyboard de curiosidades
+
+### 6. `audio.js`
+- usa voz por defecto del nicho si no se especificó otra
+
+### 7. `historial`
+- guarda que eso era del nicho `curiosidades`
+
+---
+
+# 8. Firmas de funciones que yo cambiaría
+
+## `guion.js`
+### antes
+```js
+generarGuion(tema, id)
+```
+
+### después
+```js
+generarGuion(tema, id, nichoConfig)
+```
+
+---
+
+## `caption.js`
+### antes
+```js
+generarCaption(guion)
+```
+
+### después
+```js
+generarCaption(guion, nichoConfig)
+```
+
+---
+
+## `imagenes.js`
+### antes
+```js
+generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo, escenario, onStoryboard, onErrorImagen)
+```
+
+### después
+```js
+generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo, escenario, onStoryboard, onErrorImagen, nichoConfig)
+```
+
+Sí, la firma queda fea. Por eso idealmente luego convendría pasar un objeto.
+
+---
+
+## Mejor aún: pasar un objeto de opciones
+Yo de hecho lo dejaría así a medio plazo:
+
+```js
+generarImagenes({
+  guion,
+  cantidad,
+  id,
+  modelo,
+  api,
+  estilo,
+  escenario,
+  nichoConfig,
+  onPrompt,
+  onStoryboard,
+  onErrorImagen
+})
+```
+
+Eso te evitará infiernos de parámetros.
+
+---
+
+# 9. Refactor importante recomendado: pasar de parámetros sueltos a objetos
+
+Esto te lo recomiendo de verdad.
+
+Ahora mismo algunas funciones ya tienen demasiados parámetros. Si vas a meter nicho, canal, idioma, defaults y más cosas, se te va a poner feo rápido.
+
+## Ejemplo ideal
+### `generarGuion`
+```js
+generarGuion({
+  tema,
+  id,
+  nichoConfig
+})
+```
+
+### `generarCaption`
+```js
+generarCaption({
+  guion,
+  nichoConfig
+})
+```
+
+### `generarImagenes`
+```js
+generarImagenes({
+  guion,
+  cantidad,
+  id,
+  modelo,
+  api,
+  estilo,
+  escenario,
+  nichoConfig,
+  onPrompt,
+  onStoryboard,
+  onErrorImagen
+})
+```
+
+No es obligatorio en la primera iteración, pero sí recomendable.
+
+---
+
+# 10. Endpoint nuevo: `/nichos`
+
+## Objetivo
+Que el frontend no tenga los nichos hardcodeados.
+
+## Respuesta sugerida
+```json
+[
+  {
+    "id": "motivacion",
+    "nombre": "Motivación",
+    "descripcion": "Shorts de motivación y disciplina",
+    "defaults": {
+      "voz": "femenino",
+      "tts": "google",
+      "estilo": "cinematico"
+    }
+  },
+  {
+    "id": "curiosidades",
+    "nombre": "Curiosidades",
+    "descripcion": "Datos sorprendentes e historia breve",
+    "defaults": {
+      "voz": "masculino",
+      "tts": "google",
+      "estilo": "cinematico"
+    }
+  }
+]
+```
+
+No hace falta devolver los prompts al frontend, claro.
+
+---
+
+# 11. Cambios exactos en el frontend
+
+## A. Añadir selector de nicho
+En la parte de “Nuevo video”:
+
+```html
+<div class="field-sm">
+  <label for="v_inputNicho">Nicho</label>
+  <select id="v_inputNicho"></select>
+</div>
+```
+
+---
+
+## B. Cargar nichos al iniciar
+Nueva función JS:
+- fetch `/nichos`
+- rellenar el select
+
+---
+
+## C. Enviar el nicho en `/generar`
+Añadir:
+```js
+const nicho = document.getElementById('v_inputNicho').value;
+```
+
+Y mandarlo en el body.
+
+---
+
+## D. Opcional: aplicar defaults al cambiar nicho
+Cuando el usuario elija `curiosidades`, puedes actualizar automáticamente:
+- voz
+- TTS
+- estilo
+- incluso cantidad sugerida
+
+Esto mejora mucho la experiencia.
+
+---
+
+# 12. Cambios exactos en historial
+
+## Estructura nueva recomendada
+```json
+{
+  "id": "uuid",
+  "tema": "inventos a
+...(truncated)...

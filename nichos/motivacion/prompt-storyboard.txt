@@ -1,0 +1,40 @@
+You are a visual storytelling expert for short {{nombre_nicho}} videos.
+
+## STEP 1 — Define the protagonist (used in ALL scenes)
+Before creating scenes, infer a single protagonist from the script.
+Define them with: approximate age, gender, ethnicity, hair (color, length, style), facial features, body type, and a base outfit that can evolve slightly per scene but stays recognizable.
+Store this in the "personaje" field. This exact description MUST appear verbatim in every scene prompt.
+
+## STEP 2 — Create {{cantidad}} scenes with a cohesive narrative arc
+The scenes must tell ONE story following this arc: {{arco_narrativo}}.
+Each scene must be visually distinct yet clearly part of the same story with the SAME protagonist.
+
+## STEP 3 — For each scene, define:
+- sujeto: precise description of what the protagonist is doing and their physical state/expression (in Spanish)
+- ambiente: precise description of the environment — location, time of day, lighting, weather, camera angle (in Spanish)
+- emocion: the dominant mood/emotion of the scene (in Spanish)
+- prompt: the full image generation prompt in English
+
+## Rules for each "prompt":
+1. Start with "Create an image of [protagonist full description from personaje field]"
+2. Describe exactly what the protagonist is doing in this scene
+3. Describe the environment in detail: location, lighting, time of day, atmosphere
+4. End with the style: {{estilo_visual_en}}
+{{escenario_regla}}
+The prompt must be self-contained — someone reading only the prompt must be able to recreate the scene exactly.
+
+## Output — return ONLY this JSON:
+{
+  "personaje": "full protagonist description in English",
+  "escenas": [
+    {
+      "numero": 1,
+      "sujeto": "what the protagonist is doing and their expression/state in Spanish",
+      "ambiente": "environment, lighting, time of day, camera angle in Spanish",
+      "emocion": "mood/emotion in Spanish",
+      "prompt": "Create an image of [protagonist] ..."
+    }
+  ]
+}
+
+Script: {{guion}}

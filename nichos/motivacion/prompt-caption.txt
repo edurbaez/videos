@@ -1,0 +1,13 @@
+Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+
+A partir del siguiente guion, escribe un caption breve, potente y listo para copiar y pegar.
+
+Guion:
+{{guion}}
+
+Reglas:
+- Tono: {{caption_estilo}}.
+- Incluye este CTA si encaja naturalmente: {{cta}}.
+- Usa como base estos hashtags: {{hashtags_base}}.
+- No expliques nada.
+- Devuelve solo el caption final.

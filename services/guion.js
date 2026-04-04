@@ -3,18 +3,20 @@ const fs = require('fs');
 require('dotenv').config();
 
 const { rutaGuion } = require('../utils/archivos');
+const { renderPrompt } = require('../utils/prompts');
 
 /**
  * Genera el guion del video en dos pasos:
- *  1. Borrador con GPT-4o (coach motivacional)
- *  2. Mejora del borrador con GPT-4o (copywriter viral)
+ *  1. Borrador con GPT-4o (rol definido por el nicho)
+ *  2. Mejora del borrador con GPT-4o (copywriter del nicho)
  * Guarda el guion mejorado en disco y retorna ambas versiones.
  *
- * @param {string} tema - El tema del video motivacional
- * @param {string} id   - UUID de la generación actual
+ * @param {string} tema        - El tema del video
+ * @param {string} id          - UUID de la generación actual
+ * @param {object} nichoConfig - Objeto retornado por cargarNicho()
  * @returns {{ guion_final: string, guion_audio: string }}
  */
-async function generarGuion(tema, id) {
+async function generarGuion(tema, id, nichoConfig) {
   const ts = () => new Date().toTimeString().slice(0, 8);
   const headers = {
     Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -22,28 +24,21 @@ async function generarGuion(tema, id) {
   };
   const endpoint = 'https://api.openai.com/v1/chat/completions';
 
+  const vars = {
+    tema,
+    nombre_nicho:     nichoConfig.nombre,
+    idioma:           nichoConfig.idioma,
+    tono:             nichoConfig.guion.tono,
+    estructura:       nichoConfig.guion.estructura,
+    palabras_objetivo: nichoConfig.guion.palabrasObjetivo,
+  };
+
   // ── PASO 1: Borrador ──────────────────────────────────────────────────────
-  console.log(`[${ts()}] Guion paso 1: generando borrador para tema "${tema}"...`);
+  console.log(`[${ts()}] Guion paso 1: generando borrador para tema "${tema}" (nicho: ${nichoConfig.id})...`);
+  const promptBorrador = renderPrompt(nichoConfig.prompts.guionBorrador, vars);
   const respBorrador = await axios.post(endpoint, {
     model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Eres un coach motivacional con más de 10 años de experiencia, ' +
-          'influenciado por oradores como Tony Robbins y Norman Vincent Peale. Estás ' +
-          'acostumbrado a dar discursos breves y poderosos dirigidos a una audiencia ' +
-          'adulta. Tu estilo combina inspiración, claridad y energía emocional.',
-      },
-      {
-        role: 'user',
-        content:
-          `Escribe un guion para un video corto de YouTube de 120 palabras sobre el tema: ${tema}. ` +
-          'El guion debe ser claro, directo, emocional e inspirador, y debe poder usarse como audio ' +
-          'sin necesidad de ajustes. Devuelve solo el texto final. Cada oración debe estar en una ' +
-          'línea separada. Comienza con una frase que atrape de inmediato la atención del espectador.',
-      },
-    ],
+    messages: [{ role: 'user', content: promptBorrador }],
     temperature: 0.8,
     max_tokens: 1000,
   }, { headers });
@@ -53,27 +48,10 @@ async function generarGuion(tema, id) {
 
   // ── PASO 2: Mejora ────────────────────────────────────────────────────────
   console.log(`[${ts()}] Guion paso 2: mejorando con copywriter viral...`);
+  const promptMejora = renderPrompt(nichoConfig.prompts.guionMejora, { ...vars, borrador });
   const respMejora = await axios.post(endpoint, {
     model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Eres un copywriter senior especializado en YouTube Shorts del nicho de motivación ' +
-          'y crecimiento personal. Reescribes guiones para que suenen modernos, virales, humanos ' +
-          'y memorables.',
-      },
-      {
-        role: 'user',
-        content:
-          'Edita y mejora este guion como copywriter profesional experto en contenido viral ' +
-          'para Shorts. REGLAS: 1. Primera línea debe ser un hook brutal que detenga el scroll. ' +
-          '2. Frases cortas, directas y memorables. 3. Tono humano, intenso, inspirador. ' +
-          '4. Elimina relleno y frases débiles. 5. Estructura: dolor → verdad incómoda → ' +
-          'cambio de perspectiva → impulso final. 6. Cada oración en una línea separada. ' +
-          `7. Devuelve únicamente la versión final mejorada. TEXTO ORIGINAL: ${borrador}`,
-      },
-    ],
+    messages: [{ role: 'user', content: promptMejora }],
     temperature: 0.9,
     max_tokens: 1000,
   }, { headers });

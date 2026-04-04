@@ -21,7 +21,9 @@ function leerHistorial() {
 /**
  * Agrega una nueva entrada al inicio del historial y guarda el archivo.
  * Mantiene solo las últimas MAX_ENTRADAS entradas.
- * @param {Object} entrada - { id, tema, caption, guion, fecha, rutas: { audio, imagenes, video } }
+ * @param {Object} entrada - { id, tema, caption, guion, fecha, rutas, nicho?, parametros? }
+ *   nicho      - id del nicho usado (ej. 'motivacion'). Opcional, default 'motivacion'.
+ *   parametros - { voz, tts, modelo, api, estilo, escenario, cantidad }. Opcional.
  */
 function guardarEntrada(entrada) {
   const historial = leerHistorial();
