@@ -153,6 +153,7 @@ const ttsFinal  = tts    || nichoConfig.defaults.tts || 'google';
 |----|--------|--------|
 | `motivacion` | Motivación | ✅ Listo (config + prompts) |
 | `curiosidades` | Curiosidades | ✅ Listo (config + prompts) |
+| `filosofia` | Filosofía | ✅ Listo (config + prompts) |
 
 ## Nichos planificados para agregar después
 - `misterio`

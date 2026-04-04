@@ -1,0 +1,31 @@
+{
+  "id": "filosofia",
+  "nombre": "Filosofía",
+  "descripcion": "Shorts de frases filosóficas con explicación breve y profunda",
+  "idioma": "es",
+  "defaults": {
+    "voz": "masculino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 80,
+    "tono": "reflexivo, profundo, pausado, accesible",
+    "estructura": "frase filosófica en voz alta, pausa breve, explicación clara en 80 palabras máximo"
+  },
+  "caption": {
+    "estilo": "reflexivo, minimalista, que invite a pensar",
+    "ctaDefault": "Sígueme para más frases que te harán pensar",
+    "hashtagsBase": ["#filosofia", "#reflexion", "#pensamiento"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "contemplación y pensamiento",
+    "arcoNarrativo": "frase en primer plano, abstracción del concepto, contexto del filósofo o época, cierre contemplativo",
+    "tipoEscenas": "frase, abstracción, contexto, contemplación",
+    "requiereStoryboard": true
+  }
+}
