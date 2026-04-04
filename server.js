@@ -249,9 +249,10 @@ app.post('/util/guion', async (req, res) => {
   if (!tema?.trim()) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
   try {
+    const nichoConfig = cargarNicho('motivacion');
     console.log(`[${ts()}] Util/guion: generando para tema="${tema}"`);
-    const { guion_final } = await generarGuion(tema, 'util-' + Date.now());
-    const caption = await generarCaption(guion_final);
+    const { guion_final } = await generarGuion(tema, 'util-' + Date.now(), nichoConfig);
+    const caption = await generarCaption(guion_final, nichoConfig);
     const texto = `${guion_final}\n\n---\n${caption}`;
     await enviarTexto(texto);
     console.log(`[${ts()}] Util/guion: enviado a Telegram.`);
@@ -290,11 +291,12 @@ app.post('/util/imagenes', async (req, res) => {
     };
 
     try {
+      const nichoConfig = cargarNicho('motivacion');
       const cantNum = parseInt(cantidad);
       console.log(`[${ts()}] Util/imagenes: tema="${tema}" cantidad=${cantNum}`);
 
       emit('progreso', { mensaje: 'Generando guion base...' });
-      const { guion_final } = await generarGuion(tema, id);
+      const { guion_final } = await generarGuion(tema, id, nichoConfig);
 
       emit('progreso', { mensaje: `Generando ${cantNum} prompts visuales en bloque...` });
 
@@ -311,7 +313,7 @@ app.post('/util/imagenes', async (req, res) => {
         emit('prompt_imagen', { n, total: cantNum, prompt });
       }, 'cinematico', 'ninguno', (escenas) => {
         emit('storyboard_listo', { escenas });
-      });
+      }, nichoConfig);
 
       emit('finalizado', { total: cantNum });
     } catch (err) {
@@ -349,9 +351,10 @@ app.post('/util/audio', async (req, res) => {
     };
 
     try {
+      const nichoConfig = cargarNicho('motivacion');
       // Paso 1: Guion
       emit('progreso', { paso: 1, mensaje: 'Generando guion...' });
-      const { guion_final, guion_audio } = await generarGuion(tema, id);
+      const { guion_final, guion_audio } = await generarGuion(tema, id, nichoConfig);
       emit('guion_listo', { guion: guion_final });
 
       // Paso 2: Audio

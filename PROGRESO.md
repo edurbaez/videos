@@ -1,8 +1,8 @@
 # Plan de refactorización: Multi-nicho
 
 ## Estado general
-Implementación por fases para pasar de nicho motivacional hardcodeado a sistema multi-nicho.
-Orden de implementación elegido para minimizar riesgos (lo que no rompe nada, primero).
+✅ **COMPLETADO** — Sistema multi-nicho completamente implementado.
+Todas las fases terminadas. La app soporta múltiples nichos end-to-end.
 
 ---
 
@@ -71,78 +71,78 @@ Fase 1 → Fase 7 → Fase 2 → Fase 3 → Fase 4 → Fase 5 → Fase 8 → Fas
 
 ---
 
-### ⬜ Fase 3 — Refactorizar services/guion.js
+### ✅ Fase 3 — Refactorizar services/guion.js
 **Objetivo:** Prompts fuera del JS, parametrizados por nicho.
 
-**Pendiente:**
-- [ ] Nueva firma: `generarGuion(tema, id, nichoConfig)`
-- [ ] Usar `nichoConfig.prompts.guionBorrador` y `nichoConfig.prompts.guionMejora`
-- [ ] Renderizar con `renderPrompt(template, { tema, tono, idioma, estructura, palabras_objetivo, nombre_nicho })`
-- [ ] Mantener guardado en disco igual
+**Completado:**
+- [x] Nueva firma: `generarGuion(tema, id, nichoConfig)`
+- [x] Usar `nichoConfig.prompts.guionBorrador` y `nichoConfig.prompts.guionMejora`
+- [x] Renderizar con `renderPrompt(template, { tema, tono, idioma, estructura, palabras_objetivo, nombre_nicho, borrador })`
+- [x] Prompts consolidados en un solo `messages` (user), sin system separado
+- [x] Guardado en disco igual
 
-**Archivos a modificar:** `services/guion.js`
+**Archivos modificados:** `services/guion.js`
 
 **Riesgo:** ALTO — mayor acoplamiento actual. Probar en local antes de confirmar.
 
 ---
 
-### ⬜ Fase 4 — Refactorizar services/caption.js
+### ✅ Fase 4 — Refactorizar services/caption.js
 **Objetivo:** Caption parametrizado por nicho.
 
-**Pendiente:**
-- [ ] Nueva firma: `generarCaption(guion, nichoConfig)`
-- [ ] Usar `nichoConfig.prompts.caption`
-- [ ] Renderizar con `renderPrompt(template, { guion, caption_estilo, hashtags_base, cta })`
+**Completado:**
+- [x] Nueva firma: `generarCaption(guion, nichoConfig)`
+- [x] Usar `nichoConfig.prompts.caption`
+- [x] Renderizar con `renderPrompt(template, { guion, nombre_nicho, caption_estilo, hashtags_base, cta })`
+- [x] `joinHashtags()` convierte el array de hashtags del config a string
 
-**Archivos a modificar:** `services/caption.js`
+**Archivos modificados:** `services/caption.js`
 
 **Riesgo:** BAJO
 
 ---
 
-### ⬜ Fase 5 — Refactorizar services/imagenes.js + storyboard.js
+### ✅ Fase 5 — Refactorizar services/imagenes.js + storyboard.js
 **Objetivo:** Quitar lenguaje motivacional hardcodeado de los prompts visuales.
 
-**Pendiente:**
-- [ ] `generarPromptVisual` — usar `nichoConfig.imagenes` en lugar de texto fijo
-- [ ] `generarTodosPrompts` — ídem
-- [ ] `generarImagenes` — nueva firma con `nichoConfig` al final (o como objeto)
-- [ ] `generarImagenesSecuencial` — ídem
-- [ ] `storyboard.js` — parámetros del nicho en el prompt del storyboard
-  - Ahora tiene hardcodeado: "short motivational videos" y arco "pain → turning point → effort → triumph"
-  - Debe venir de `nichoConfig.imagenes.arcoNarrativo` y `nichoConfig.imagenes.tipoEscenas`
+**Completado:**
+- [x] `generarPromptVisual(guion, n, total, estilo, escenario, nichoConfig)` — usa `nichoConfig.prompts.imagenes` con renderPrompt
+- [x] `generarTodosPrompts(guion, cantidad, estilo, escenario, nichoConfig)` — usa `nichoConfig.imagenes.arcoNarrativo` y `nichoConfig.nombre`
+- [x] `generarImagenes(..., nichoConfig)` — pasa nichoConfig a storyboard y generarPromptVisual
+- [x] `generarImagenesSecuencial(..., nichoConfig)` — ídem
+- [x] `storyboard.js` — usa `nichoConfig.prompts.storyboard` con renderPrompt; arco y nombre_nicho del config
+- [x] Endpoints util `/util/guion`, `/util/imagenes`, `/util/audio` arreglados — cargan `motivacion` por defecto
 
-**Archivos a modificar:** `services/imagenes.js`, `services/storyboard.js`
+**Archivos modificados:** `services/imagenes.js`, `services/storyboard.js`, `server.js`
 
 **Riesgo:** ALTO — prompts visuales son delicados. Probar nicho por nicho.
 
 ---
 
-### ⬜ Fase 8 — Frontend (creacion_de_contenido.html)
+### ✅ Fase 8 — Frontend (creacion_de_contenido.html)
 **Objetivo:** Selector de nicho en el formulario de vídeo.
 
-**Pendiente:**
-- [ ] Añadir `<select id="v_inputNicho">` en sección "Nuevo video"
-- [ ] Función JS para hacer `fetch('/nichos')` y llenar el select
-- [ ] Llamar esa función al cargar la página
-- [ ] Enviar `nicho` en el body del `POST /generar`
-- [ ] Opcional: al cambiar nicho, autocompletar voz/tts/estilo con los defaults del nicho
+**Completado:**
+- [x] Añadir `<select id="v_inputNicho">` en sección "Nuevo video" (antes del textarea)
+- [x] `vCargarNichos()` — fetch('/nichos') al cargar la página, rellena el select dinámicamente
+- [x] `vAplicarDefaultsNicho()` — al cambiar nicho, aplica defaults de voz y tts
+- [x] Enviar `nicho` en el body del `POST /generar`
 
-**Archivos a modificar:** `public/creacion_de_contenido.html`
+**Archivos modificados:** `public/creacion_de_contenido.html`
 
 **Riesgo:** MEDIO — coordinar con el endpoint `/nichos` del backend.
 
 ---
 
-### ⬜ Fase 6 — Audio: defaults por nicho
+### ✅ Fase 6 — Audio: defaults por nicho
 **Objetivo:** Si no se especifica voz/TTS, usar los defaults del nicho.
 
-**Pendiente:**
-- [ ] En `server.js`, antes de llamar `generarAudio`, resolver voz/tts:
-  - Si el usuario mandó valor → usar ese
-  - Si no → usar `nichoConfig.defaults.voz` y `nichoConfig.defaults.tts`
-
-**Archivos a modificar:** `server.js` (cuando ya esté en Fase 2)
+**Completado en Fase 2** — ya implementado en `server.js` líneas 104-109:
+```js
+const vozFinal  = genero || nichoConfig.defaults.voz || 'femenino';
+const ttsFinal  = tts    || nichoConfig.defaults.tts || 'google';
+// ídem para modelo, api, estilo, escenario
+```
 
 **Riesgo:** NINGUNO — lógica additive, no reemplaza nada.
 
@@ -194,4 +194,46 @@ Fase 1 → Fase 7 → Fase 2 → Fase 3 → Fase 4 → Fase 5 → Fase 8 → Fas
 
 **Estado al cerrar:** Pipeline funcional. El nicho viaja por todo el flujo. Los servicios aún no lo usan (lo ignoran). Sin regresión.
 
-**Próxima sesión empieza en:** Fase 3 (services/guion.js)
+---
+
+### Sesión 3 — 2026-04-04
+**Completado:** Fase 3 — services/guion.js refactorizado
+
+**Archivos modificados:**
+- `services/guion.js` — nueva firma `generarGuion(tema, id, nichoConfig)`, prompts leídos de nichoConfig, renderizados con renderPrompt, rol/system colapsado al prompt de usuario (template ya incluye el rol)
+
+**Estado al cerrar:** guion.js ya no tiene texto motivacional hardcodeado. Usa los prompts del nicho. Pipeline compatible: server.js ya pasaba nichoConfig como tercer argumento desde Fase 2.
+
+---
+
+### Sesión 4 — 2026-04-04
+**Completado:** Fase 4 — services/caption.js refactorizado
+
+**Archivos modificados:**
+- `services/caption.js` — nueva firma `generarCaption(guion, nichoConfig)`, prompt leído de nichoConfig, hashtags convertidos con joinHashtags()
+
+**Estado al cerrar:** caption.js sin texto hardcodeado. Usa prompt y parámetros del nicho. Compatible con server.js (ya pasaba nichoConfig).
+
+---
+
+### Sesión 5 — 2026-04-04
+**Completado:** Fase 5 — imagenes.js + storyboard.js refactorizados + endpoints util arreglados
+
+**Archivos modificados:**
+- `services/storyboard.js` — nueva firma con nichoConfig, usa prompt-storyboard.txt vía renderPrompt
+- `services/imagenes.js` — generarPromptVisual, generarTodosPrompts, generarImagenes, generarImagenesSecuencial actualizados con nichoConfig
+- `server.js` — /util/guion, /util/imagenes, /util/audio arreglados (cargan nichoConfig='motivacion')
+
+**Estado al cerrar:** App completamente funcional. Todo el pipeline usa nichoConfig. Sin texto hardcodeado en ningún servicio. Los endpoints util funcionan con motivacion por defecto.
+
+---
+
+### Sesión 6 — 2026-04-04
+**Completado:** Fase 8 — selector de nicho en el frontend
+
+**Archivos modificados:**
+- `public/creacion_de_contenido.html` — select#v_inputNicho, vCargarNichos(), vAplicarDefaultsNicho(), nicho en body del POST
+
+**Estado al cerrar:** El frontend carga los nichos dinámicamente desde /nichos. Al cambiar nicho aplica defaults de voz/tts. El campo nicho viaja en el POST /generar.
+
+**Próxima sesión empieza en:** Fase 6 (audio defaults por nicho en server.js) — última fase

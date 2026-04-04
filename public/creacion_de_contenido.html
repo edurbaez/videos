@@ -726,6 +726,12 @@
     <div class="card" id="v_cardForm">
       <h3>Nuevo video</h3>
       <div class="form-row">
+        <div class="field-sm">
+          <label for="v_inputNicho">Nicho</label>
+          <select id="v_inputNicho">
+            <option value="motivacion">Motivación</option>
+          </select>
+        </div>
         <div class="field">
           <label for="v_inputTema">Tema del video</label>
           <textarea id="v_inputTema" placeholder="Ej: superar el miedo al fracaso, la disciplina como hábito diario..."></textarea>
@@ -1154,6 +1160,27 @@ let vStoryboardActivo = false;
 let vSubtitulosListos = false;
 let vImagenesListas   = false;
 
+async function vCargarNichos() {
+  try {
+    const resp = await fetch('/nichos');
+    if (!resp.ok) return;
+    const nichos = await resp.json();
+    const sel = document.getElementById('v_inputNicho');
+    sel.innerHTML = nichos.map(n => `<option value="${n.id}">${n.nombre}</option>`).join('');
+    sel.addEventListener('change', () => vAplicarDefaultsNicho(nichos));
+  } catch {}
+}
+
+function vAplicarDefaultsNicho(nichos) {
+  const id = document.getElementById('v_inputNicho').value;
+  const nicho = nichos.find(n => n.id === id);
+  if (!nicho?.defaults) return;
+  if (nicho.defaults.voz)      vSelectVoz(nicho.defaults.voz);
+  if (nicho.defaults.tts)      vSelectTTS(nicho.defaults.tts);
+}
+
+vCargarNichos();
+
 function vCheckVideoReady() {
   if (vSubtitulosListos && vImagenesListas) vMarcarPaso('v_step-video','active');
 }
@@ -1206,6 +1233,7 @@ function vOcultarError() {
 
 document.getElementById('v_btnGenerar').addEventListener('click', async () => {
   const tema     = document.getElementById('v_inputTema').value.trim();
+  const nicho    = document.getElementById('v_inputNicho').value;
   const cantidad = document.getElementById('v_inputCantidad').value;
   const modelo   = document.getElementById('v_inputModelo').value;
   const apiMap   = { 'dall-e-3':'openai', 'dall-e-2':'openai', 'imagen-3.0-generate-002':'google' };
@@ -1240,7 +1268,7 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
     const resp = await fetch('/generar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS, estilo: vEstilo, escenario: vEscenario }),
+      body: JSON.stringify({ tema, nicho, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS, estilo: vEstilo, escenario: vEscenario }),
     });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || 'Error al iniciar.'); }
     const { id } = await resp.json();

@@ -7,6 +7,7 @@ require('dotenv').config();
 const { rutaImagen } = require('../utils/archivos');
 const { ESTILOS_ES, ESTILOS_EN, ESCENARIOS_EN } = require('../utils/estilos');
 const { generarStoryboard } = require('./storyboard');
+const { renderPrompt } = require('../utils/prompts');
 
 // Galería en memoria: persiste mientras el servidor esté corriendo
 const galeria = [];
@@ -27,22 +28,20 @@ function obtenerGaleria() {
  * @param {number} total  - Total de imágenes a generar
  * @returns {string} - Prompt visual en inglés
  */
-async function generarPromptVisual(guion, n, total, estilo = 'cinematico', escenario = 'ninguno') {
-  const estiloES = ESTILOS_ES[estilo] || ESTILOS_ES.cinematico;
-  const estiloEN = ESTILOS_EN[estilo] || ESTILOS_EN.cinematico;
+async function generarPromptVisual(guion, n, total, estilo = 'cinematico', escenario = 'ninguno', nichoConfig) {
+  const estiloEN    = ESTILOS_EN[estilo]    || ESTILOS_EN.cinematico;
   const escenarioEN = ESCENARIOS_EN[escenario] || '';
 
-  const content =
-    'Actúa como un experto en prompts visuales para videos motivacionales. ' +
-    `Escribe un prompt en inglés para generar una imagen motivacional con estilo ${estiloES}, ` +
-    'sujeto principal claro y entorno relevante al mensaje. ' +
-    'Debe ser una escena DIFERENTE y COMPLEMENTARIA a las otras escenas del video. ' +
-    `Esta es la imagen número ${n} de ${total}, así que mostrá un momento distinto ` +
-    'del viaje motivacional (por ejemplo: el dolor inicial, el punto de quiebre, ' +
-    "el esfuerzo, el triunfo). Empieza con 'Create an image of'. " +
-    `El estilo visual DEBE ser: ${estiloEN}. ` +
-    (escenarioEN ? `El entorno/ambiente DEBE incluir: ${escenarioEN}. ` : '') +
-    `Devuelve solo el prompt. Texto del guion: ${guion}`;
+  const content = renderPrompt(nichoConfig.prompts.imagenes, {
+    guion,
+    n,
+    total,
+    nombre_nicho:     nichoConfig.nombre,
+    estilo_narrativo: nichoConfig.imagenes.estiloNarrativo,
+    tipo_escenas:     nichoConfig.imagenes.tipoEscenas,
+    estilo_visual_en: estiloEN,
+    escenario_en:     escenarioEN,
+  });
 
   const resp = await axios.post(
     'https://api.openai.com/v1/chat/completions',
@@ -263,16 +262,16 @@ function crearPlaceholder(ruta) {
  * @param {string} id       - UUID de la generación
  * @returns {string[]} - Array de rutas absolutas de las imágenes generadas
  */
-async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, onErrorImagen = null) {
+async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, onErrorImagen = null, nichoConfig) {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  console.log(`[${ts()}] Imagenes: generando ${cantidad} imágenes para id ${id} (api=${api} modelo=${modelo} estilo=${estilo} escenario=${escenario})...`);
+  console.log(`[${ts()}] Imagenes: generando ${cantidad} imágenes para id ${id} (api=${api} modelo=${modelo} estilo=${estilo} escenario=${escenario} nicho=${nichoConfig.id})...`);
 
   // Generar storyboard cuando hay más de una imagen para que los prompts sean una secuencia narrativa
   let storyboardPrompts = null;
   if (cantidad > 1) {
     console.log(`[${ts()}] Imagenes: generando storyboard para ${cantidad} escenas...`);
     try {
-      const escenas = await generarStoryboard(guion, cantidad, estilo, escenario);
+      const escenas = await generarStoryboard(guion, cantidad, estilo, escenario, nichoConfig);
       if (onStoryboard) onStoryboard(escenas);
       storyboardPrompts = escenas.map(e => e.prompt);
       console.log(`[${ts()}] Imagenes: storyboard listo con ${escenas.length} escenas.`);
@@ -296,7 +295,7 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
     } else {
       console.log(`[${ts()}] Imagen ${n}/${cantidad}: generando prompt visual...`);
       try {
-        promptVisual = await generarPromptVisual(guion, n, cantidad, estilo, escenario);
+        promptVisual = await generarPromptVisual(guion, n, cantidad, estilo, escenario, nichoConfig);
         if (onPrompt) onPrompt(n, promptVisual);
         console.log(`[${ts()}] Imagen ${n}/${cantidad}: prompt listo → llamando ${api}/${modelo}...`);
       } catch (err) {
@@ -359,15 +358,14 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
  * Genera todos los prompts visuales en una sola llamada a GPT.
  * Devuelve un array de N strings, uno por fotograma.
  */
-async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escenario = 'ninguno') {
-  const estiloEN = ESTILOS_EN[estilo] || ESTILOS_EN.cinematico;
+async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escenario = 'ninguno', nichoConfig) {
+  const estiloEN    = ESTILOS_EN[estilo]    || ESTILOS_EN.cinematico;
   const escenarioEN = ESCENARIOS_EN[escenario] || '';
 
   const content =
-    `Actúa como experto en prompts visuales para videos motivacionales. ` +
+    `Actúa como experto en prompts visuales para videos de ${nichoConfig.nombre}. ` +
     `Escribe exactamente ${cantidad} prompts en inglés, uno por párrafo separado por línea en blanco. ` +
-    `Cada prompt describe una escena DIFERENTE que juntas narran el viaje motivacional: ` +
-    `dolor inicial → quiebre → esfuerzo → triunfo (adapta según cantidad). ` +
+    `Cada prompt describe una escena DIFERENTE que juntas narran: ${nichoConfig.imagenes.arcoNarrativo} (adapta según cantidad). ` +
     `Cada prompt empieza con "Create an image of". ` +
     `El estilo visual de TODOS los prompts DEBE ser: ${estiloEN}. ` +
     (escenarioEN ? `El entorno/ambiente de TODOS los prompts DEBE incluir: ${escenarioEN}. ` : '') +
@@ -403,24 +401,24 @@ async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escen
  * Genera imágenes una por una (secuencial).
  * Llama onCadaImagen(n, ruta, urlPublica) después de guardar cada una.
  */
-async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null) {
+async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, nichoConfig) {
   const ts = () => new Date().toTimeString().slice(0, 8);
 
   let prompts;
   if (cantidad > 1) {
-    console.log(`[${ts()}] Imagenes: generando storyboard para ${cantidad} escenas (estilo=${estilo} escenario=${escenario})...`);
+    console.log(`[${ts()}] Imagenes: generando storyboard para ${cantidad} escenas (estilo=${estilo} escenario=${escenario} nicho=${nichoConfig.id})...`);
     try {
-      const escenas = await generarStoryboard(guion, cantidad, estilo, escenario);
+      const escenas = await generarStoryboard(guion, cantidad, estilo, escenario, nichoConfig);
       if (onStoryboard) onStoryboard(escenas);
       prompts = escenas.map(e => e.prompt);
       console.log(`[${ts()}] Imagenes: storyboard listo. Procesando secuencialmente...`);
     } catch (err) {
       console.warn(`[${ts()}] Imagenes: error en storyboard (${err.message}), usando prompts en bloque.`);
-      prompts = await generarTodosPrompts(guion, cantidad, estilo, escenario);
+      prompts = await generarTodosPrompts(guion, cantidad, estilo, escenario, nichoConfig);
     }
   } else {
     console.log(`[${ts()}] Imagenes: generando 1 prompt (sin storyboard)...`);
-    prompts = await generarTodosPrompts(guion, 1, estilo, escenario);
+    prompts = await generarTodosPrompts(guion, 1, estilo, escenario, nichoConfig);
   }
   console.log(`[${ts()}] Imagenes: ${prompts.length} prompts listos. Procesando secuencialmente...`);
 
