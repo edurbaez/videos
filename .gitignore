@@ -17,6 +17,7 @@ output/videos/*
 # Datos de runtime
 historial.json
 
-# Archivos personales/IDE
+# Archivos personales/IDE y notas de planificación
 .claude/
 sugerencias.md
+nplan

@@ -1,9 +1,9 @@
-# Generador de Shorts Motivacionales
+# Generador de Shorts Multi-Nicho
 
-Genera YouTube Shorts motivacionales de forma automática:
-**Guion → Audio → Imágenes → Video → Telegram**
+Genera YouTube Shorts de forma automática para múltiples nichos de contenido:
+**Nicho → Guion → Audio → Imágenes → Video → Telegram**
 
-Incluye además utilidades independientes para generar solo guiones, imágenes o audios.
+Incluye utilidades independientes para generar solo guiones, imágenes o audios, y un sistema de nichos configurable con prompts externos.
 
 ---
 
@@ -160,20 +160,57 @@ Abrir el navegador en: [http://localhost:3000](http://localhost:3000)
 
 ---
 
+## Sistema de nichos
+
+Cada nicho define su propio tono, prompts, voz por defecto y estilo narrativo. La app carga la configuración del nicho antes de iniciar cualquier generación.
+
+### Nichos disponibles
+
+| ID | Nombre | Voz default | TTS |
+|---|---|---|---|
+| `motivacion` | Motivación | femenino | google |
+| `curiosidades` | Curiosidades | masculino | google |
+| `filosofia` | Filosofía | masculino | google |
+
+### Estructura de un nicho
+
+Cada nicho vive en `nichos/<id>/` y contiene:
+
+```
+nichos/<id>/
+├── config.json               Metadatos, defaults y parámetros del nicho
+├── prompt-guion-borrador.txt Prompt para el primer borrador del guion
+├── prompt-guion-mejora.txt   Prompt para refinar el guion
+├── prompt-caption.txt        Prompt para el caption de YouTube/Telegram
+├── prompt-imagenes.txt       Prompt para generar prompts visuales individuales
+└── prompt-storyboard.txt     Prompt para el storyboard completo
+```
+
+Los prompts usan placeholders `{{tema}}`, `{{tono}}`, `{{idioma}}`, etc. que se reemplazan en tiempo de ejecución.
+
+### Añadir un nuevo nicho
+
+1. Crear carpeta `nichos/<nuevo-id>/`
+2. Crear `config.json` con el formato de los nichos existentes
+3. Crear los 5 archivos de prompts `.txt`
+4. El endpoint `GET /nichos` lo detecta automáticamente
+
+---
+
 ## Funcionalidades
 
 ### 1. Pipeline completo — Video Short
 
-Genera un Short completo end-to-end a partir de un tema.
+Genera un Short completo end-to-end a partir de un tema y nicho.
 
 **Flujo:**
 
 ```
-Tema
- └─ Guion (GPT-4o, 2 pasos: borrador + mejora viral)
-     ├─ Caption (GPT-4o-mini)             ─┐
-     ├─ Audio (Google TTS Neural2)         ├─ en paralelo
-     └─ Imágenes (DALL-E 3 / Imagen 3)   ─┘
+Nicho + Tema
+ └─ Guion (GPT-4o, 2 pasos: borrador + mejora con prompts del nicho)
+     ├─ Caption (GPT-4o-mini, prompt del nicho)   ─┐
+     ├─ Audio (Google TTS Neural2)                  ├─ en paralelo
+     └─ Imágenes (DALL-E 3 / Imagen 3)            ─┘
          └─ Video (FFmpeg, 1080x1920, xfade)
              └─ Telegram (caption + video)
 ```
@@ -182,8 +219,9 @@ Tema
 
 | Opción | Valores | Default |
 |---|---|---|
+| Nicho | `motivacion` / `curiosidades` / `filosofia` | `motivacion` |
 | Cantidad de imágenes | 1 – 6 | 1 |
-| Voz del audio | `masculino` / `femenino` | `femenino` |
+| Voz del audio | `masculino` / `femenino` | según nicho |
 | API de imágenes | `openai` / `google` | `openai` |
 | Modelo de imágenes | ver tabla abajo | `dall-e-3` |
 
@@ -208,7 +246,7 @@ Tema
 
 ### 2. Utilidad — Solo guion + caption → Telegram
 
-Genera el guion (2 pasos con GPT-4o) y el caption, y los envía como texto a Telegram. No genera audio, imágenes ni video.
+Genera el guion (2 pasos con GPT-4o) y el caption, y los envía como texto a Telegram. No genera audio, imágenes ni video. Usa el nicho `motivacion` por defecto.
 
 **Endpoint:** `POST /util/guion`
 ```json
@@ -257,9 +295,17 @@ Genera el guion, lo convierte a MP3 con Google TTS y envía el guion (texto) + e
 
 ---
 
-### 6. Historial
+### 6. Listar nichos
 
-Devuelve las últimas 50 generaciones completas (guion, caption, rutas de archivos, fecha).
+Devuelve los nichos disponibles con sus defaults. Lo usa el frontend para rellenar el selector dinámicamente.
+
+**Endpoint:** `GET /nichos`
+
+---
+
+### 7. Historial
+
+Devuelve las últimas 50 generaciones completas (guion, caption, nicho, parámetros usados, rutas de archivos, fecha).
 
 **Endpoint:** `GET /historial`
 
@@ -269,7 +315,7 @@ Los videos del historial pueden reenviarse a Telegram con:
 
 ---
 
-### 7. Galería de imágenes
+### 8. Galería de imágenes
 
 Devuelve todas las imágenes generadas durante la sesión actual del servidor (en memoria).
 
@@ -281,25 +327,45 @@ Devuelve todas las imágenes generadas durante la sesión actual del servidor (e
 
 ```
 proyecto/
-├── server.js              Servidor Express + rutas + SSE
-├── .env                   Variables de entorno (no subir a git)
+├── server.js                  Servidor Express + rutas + SSE
+├── .env                       Variables de entorno (no subir a git)
 ├── .gitignore
 ├── package.json
 ├── README.md
-├── historial.json         Se crea automáticamente
+├── PROGRESO.md                Estado de implementación del sistema multi-nicho
+├── historial.json             Se crea automáticamente
+├── nichos/
+│   ├── motivacion/            Nicho de motivación y crecimiento personal
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   ├── curiosidades/          Nicho de datos curiosos e historia
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   └── filosofia/             Nicho de filosofía y reflexión
+│       ├── config.json
+│       └── prompt-*.txt (×5)
 ├── services/
-│   ├── guion.js           Genera el guion con GPT-4o (2 pasos)
-│   ├── caption.js         Genera el caption con GPT-4o-mini
-│   ├── audio.js           Sintetiza audio MP3 con Google TTS Neural2
-│   ├── imagenes.js        Genera imágenes con DALL-E o Google Imagen 3
-│   ├── video.js           Renderiza el video vertical con FFmpeg
-│   └── telegram.js        Envía video, audio, fotos y texto a Telegram
+│   ├── nichos.js              Loader de nichos: listarNichos(), cargarNicho()
+│   ├── guion.js               Genera el guion con GPT-4o (2 pasos, prompts por nicho)
+│   ├── caption.js             Genera el caption con GPT-4o-mini (prompt por nicho)
+│   ├── audio.js               Sintetiza audio MP3 con Google TTS Neural2
+│   ├── imagenes.js            Genera imágenes con DALL-E o Google Imagen 3
+│   ├── storyboard.js          Genera el storyboard visual por nicho
+│   ├── subtitulos.js          Generación de subtítulos
+│   ├── video.js               Renderiza el video vertical con FFmpeg
+│   └── telegram.js            Envía video, audio, fotos y texto a Telegram
 ├── utils/
-│   ├── archivos.js        Rutas y creación de carpetas de output
-│   └── historial.js       Lectura/escritura del historial JSON
+│   ├── prompts.js             renderPrompt() — reemplaza {{placeholders}} en prompts
+│   ├── estilos.js             Estilos y escenarios visuales disponibles
+│   ├── archivos.js            Rutas y creación de carpetas de output
+│   └── historial.js           Lectura/escritura del historial JSON
 ├── public/
-│   └── index.html         Frontend completo (HTML + CSS + JS)
-└── output/                Se crea automáticamente
+│   ├── index.html             Página principal
+│   ├── creacion_de_contenido.html  Pipeline completo de video (con selector de nicho)
+│   ├── guion.html             Utilidad: solo guion
+│   ├── imagenes.html          Utilidad: solo imágenes
+│   └── audio.html             Utilidad: solo audio
+└── output/                    Se crea automáticamente
     ├── guiones/
     ├── audios/
     ├── imagenes/
@@ -314,5 +380,6 @@ proyecto/
 - Las imágenes del pipeline principal se generan **en paralelo**; las de la utilidad `/util/imagenes` se generan de forma **secuencial** (una a la vez, enviando cada una a Telegram inmediatamente).
 - Si una imagen falla 2 veces seguidas, se sustituye por un **placeholder negro** (1080×1920) para no interrumpir el video.
 - El video final es **H.264 + AAC 192k**, resolución **1080×1920** (9:16), con transiciones `xfade:fade` de 0.5 s entre imágenes. Si la duración del audio supera el tiempo de las imágenes, estas se repiten en bucle.
-- El historial guarda las últimas **50 generaciones** en `historial.json`.
+- El historial guarda las últimas **50 generaciones** en `historial.json`, incluyendo el nicho y parámetros usados.
 - El progreso de cada operación se transmite al frontend mediante **Server-Sent Events (SSE)**.
+- Si no se especifica `nicho` en el request, se usa `motivacion` por defecto (compatibilidad hacia atrás).
