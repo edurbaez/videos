@@ -1,0 +1,31 @@
+{
+  "id": "historia",
+  "nombre": "Historia",
+  "descripcion": "Shorts sobre eventos históricos sorprendentes, personajes clave y momentos que cambiaron el mundo",
+  "idioma": "es",
+  "defaults": {
+    "voz": "masculino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 4,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 90,
+    "tono": "narrativo, épico, informativo, con ritmo de documental de alta calidad",
+    "estructura": "contexto histórico rápido, hecho o dato sorprendente que pocos conocen, relevancia o legado hasta hoy"
+  },
+  "caption": {
+    "estilo": "narrativo, que genere orgullo o asombro por la historia, con gancho educativo",
+    "ctaDefault": "Sígueme para aprender historia de una forma que nunca olvidarás",
+    "hashtagsBase": ["#historia", "#historiamundial", "#datoshistoricos", "#curiosidadeshistoricas"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "épica histórica cinematográfica",
+    "arcoNarrativo": "época y contexto → protagonista o evento clave → momento de máxima tensión o decisión → consecuencia o legado",
+    "tipoEscenas": "contexto, protagonista, climax, legado",
+    "requiereStoryboard": true
+  }
+}

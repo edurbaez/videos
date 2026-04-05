@@ -1,0 +1,31 @@
+{
+  "id": "guerra",
+  "nombre": "Guerra",
+  "descripcion": "Shorts sobre batallas, estrategias militares y momentos decisivos de la historia bélica",
+  "idioma": "es",
+  "defaults": {
+    "voz": "masculino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 4,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 90,
+    "tono": "tenso, narrativo, impactante, con peso histórico y respeto por las víctimas",
+    "estructura": "situación de máxima tensión o batalla, decisión o acción clave, consecuencia que cambió el curso de la guerra o la historia"
+  },
+  "caption": {
+    "estilo": "tenso, dramático, que transmita el peso de los eventos históricos bélicos",
+    "ctaDefault": "Sígueme para conocer los momentos más decisivos de la historia bélica",
+    "hashtagsBase": ["#guerra", "#historiamilitar", "#batallas", "#historiabélica"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "drama bélico épico y tenso",
+    "arcoNarrativo": "escenario de guerra previo → momento de mayor tensión o batalla → consecuencia y aftermath",
+    "tipoEscenas": "escenario, batalla, consecuencia, aftermath",
+    "requiereStoryboard": true
+  }
+}

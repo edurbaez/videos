@@ -1,0 +1,31 @@
+{
+  "id": "salud_ejercicio",
+  "nombre": "Salud y Ejercicio",
+  "descripcion": "Shorts sobre fitness, entrenamiento, hábitos saludables y bienestar físico",
+  "idioma": "es",
+  "defaults": {
+    "voz": "femenino",
+    "tts": "google",
+    "estilo": "moderno",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 80,
+    "tono": "motivador, práctico, energético, basado en ciencia pero accesible",
+    "estructura": "problema o mito común sobre ejercicio, solución respaldada por evidencia, acción concreta que el espectador puede aplicar hoy"
+  },
+  "caption": {
+    "estilo": "motivador, práctico, con tono de coach cercano y accesible",
+    "ctaDefault": "Sígueme para más consejos de ejercicio que realmente funcionan",
+    "hashtagsBase": ["#ejercicio", "#fitness", "#saludable", "#entrenamiento", "#bienestar"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "energía y transformación física",
+    "arcoNarrativo": "estado inicial o problema → esfuerzo y acción → resultado y beneficio",
+    "tipoEscenas": "problema, accion, resultado",
+    "requiereStoryboard": true
+  }
+}

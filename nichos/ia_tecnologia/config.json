@@ -1,0 +1,31 @@
+{
+  "id": "ia_tecnologia",
+  "nombre": "IA y Tecnología",
+  "descripcion": "Shorts sobre inteligencia artificial, innovación tecnológica y el futuro digital",
+  "idioma": "es",
+  "defaults": {
+    "voz": "masculino",
+    "tts": "openai",
+    "estilo": "minimalista",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 85,
+    "tono": "informativo, asombroso, accesible, con sentido de urgencia sobre el futuro",
+    "estructura": "dato o avance tecnológico impactante, explicación clara de qué significa, implicación práctica para el espectador"
+  },
+  "caption": {
+    "estilo": "directo, informativo, que genere asombro y reflexión sobre el futuro",
+    "ctaDefault": "Sígueme para estar al día con la IA y la tecnología",
+    "hashtagsBase": ["#inteligenciaartificial", "#tecnologia", "#futuro", "#ia"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "innovación y asombro tecnológico",
+    "arcoNarrativo": "concepto o máquina tecnológica → proceso o funcionamiento → impacto en la vida humana",
+    "tipoEscenas": "concepto, proceso, impacto",
+    "requiereStoryboard": true
+  }
+}

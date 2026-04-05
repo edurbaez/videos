@@ -1,0 +1,31 @@
+{
+  "id": "salud_alimentacion",
+  "nombre": "Alimentación y Recetas",
+  "descripcion": "Shorts sobre nutrición, alimentos saludables, recetas rápidas y hábitos alimenticios",
+  "idioma": "es",
+  "defaults": {
+    "voz": "femenino",
+    "tts": "google",
+    "estilo": "moderno",
+    "escenario": "ninguno",
+    "cantidadImagenes": 3,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 80,
+    "tono": "práctico, accesible, entusiasta, con datos nutricionales interesantes sin ser técnico",
+    "estructura": "alimento, receta o hábito nutricional + beneficio concreto para la salud + cómo aplicarlo de forma sencilla hoy"
+  },
+  "caption": {
+    "estilo": "práctico, apetitoso, con tono cercano de amigo que te da consejos de cocina y salud",
+    "ctaDefault": "Sígueme para más recetas y consejos de alimentación saludable",
+    "hashtagsBase": ["#alimentacion", "#recetassaludables", "#nutricion", "#comidасаna", "#recetas"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "frescura y apetito saludable",
+    "arcoNarrativo": "ingrediente o plato en primer plano → preparación o proceso → resultado final apetitoso y saludable",
+    "tipoEscenas": "ingrediente, preparacion, resultado",
+    "requiereStoryboard": true
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "misterio",
+  "nombre": "Misterio",
+  "descripcion": "Shorts sobre fenómenos inexplicables, conspiraciones y misterios del mundo",
+  "idioma": "es",
+  "defaults": {
+    "voz": "masculino",
+    "tts": "google",
+    "estilo": "cinematico",
+    "escenario": "ninguno",
+    "cantidadImagenes": 4,
+    "modeloImagen": "dall-e-3",
+    "apiImagen": "openai"
+  },
+  "guion": {
+    "palabrasObjetivo": 90,
+    "tono": "intrigante, misterioso, escalofriante pero accesible, suspense controlado",
+    "estructura": "gancho con pregunta o dato impactante, desarrollo del misterio, cierre que deja al espectador con ganas de saber más"
+  },
+  "caption": {
+    "estilo": "intrigante, que genere curiosidad y miedo sano, con tono conspirativo",
+    "ctaDefault": "Sígueme para más misterios que no tienen explicación",
+    "hashtagsBase": ["#misterio", "#inexplicable", "#conspiracion", "#paranormal"]
+  },
+  "imagenes": {
+    "estiloNarrativo": "tensión y misterio creciente",
+    "arcoNarrativo": "ambiente inquietante → revelación del misterio → momento de mayor tensión → cierre ambiguo sin resolver",
+    "tipoEscenas": "ambiente, revelacion, tension, cierre",
+    "requiereStoryboard": true
+  }
+}

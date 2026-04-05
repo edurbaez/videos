@@ -166,11 +166,17 @@ Cada nicho define su propio tono, prompts, voz por defecto y estilo narrativo. L
 
 ### Nichos disponibles
 
-| ID | Nombre | Voz default | TTS |
-|---|---|---|---|
-| `motivacion` | Motivación | femenino | google |
-| `curiosidades` | Curiosidades | masculino | google |
-| `filosofia` | Filosofía | masculino | google |
+| ID | Nombre | Voz default | TTS | Temas de ejemplo |
+|---|---|---|---|---|
+| `motivacion` | Motivación | femenino | google | "La disciplina supera al talento", "Empieza aunque no estés listo", "El fracaso es parte del proceso" |
+| `curiosidades` | Curiosidades | masculino | google | "Por qué bostezamos cuando vemos bostezar a alguien", "El idioma que desapareció en una generación", "La bacteria que sobrevivió en el espacio" |
+| `filosofia` | Filosofía | masculino | google | "No puedes bañarte dos veces en el mismo río (Heráclito)", "El hombre está condenado a ser libre (Sartre)", "Solo sé que no sé nada (Sócrates)" |
+| `misterio` | Misterio | masculino | google | "El triángulo de las Bermudas", "Las líneas de Nazca", "El caso de los 9 excursionistas Dyatlov" |
+| `ia_tecnologia` | IA y Tecnología | masculino | openai | "Cómo funciona ChatGPT en 60 segundos", "La IA que detecta cáncer mejor que un médico", "Qué es la computación cuántica" |
+| `historia` | Historia | masculino | google | "La batalla de Termópilas", "Por qué cayó el Imperio Romano", "El día que se robó la Mona Lisa" |
+| `guerra` | Guerra | masculino | google | "La batalla de Stalingrado", "D-Day: el desembarco de Normandía", "La guerra de los 100 años en 90 segundos" |
+| `salud_ejercicio` | Salud y Ejercicio | femenino | google | "Por qué no deberías hacer cardio en ayunas", "El ejercicio más efectivo para quemar grasa", "Cuántas repeticiones necesitas realmente" |
+| `salud_alimentacion` | Alimentación y Recetas | femenino | google | "Los beneficios del aguacate que nadie te cuenta", "Receta de bowl de proteína en 5 minutos", "Por qué el aceite de oliva es el mejor para cocinar" |
 
 ### Estructura de un nicho
 
@@ -219,7 +225,7 @@ Nicho + Tema
 
 | Opción | Valores | Default |
 |---|---|---|
-| Nicho | `motivacion` / `curiosidades` / `filosofia` | `motivacion` |
+| Nicho | ver tabla de nichos | `motivacion` |
 | Cantidad de imágenes | 1 – 6 | 1 |
 | Voz del audio | `masculino` / `femenino` | según nicho |
 | API de imágenes | `openai` / `google` | `openai` |
@@ -335,13 +341,31 @@ proyecto/
 ├── PROGRESO.md                Estado de implementación del sistema multi-nicho
 ├── historial.json             Se crea automáticamente
 ├── nichos/
-│   ├── motivacion/            Nicho de motivación y crecimiento personal
+│   ├── motivacion/            Motivación y crecimiento personal
 │   │   ├── config.json
 │   │   └── prompt-*.txt (×5)
-│   ├── curiosidades/          Nicho de datos curiosos e historia
+│   ├── curiosidades/          Datos curiosos y hechos sorprendentes
 │   │   ├── config.json
 │   │   └── prompt-*.txt (×5)
-│   └── filosofia/             Nicho de filosofía y reflexión
+│   ├── filosofia/             Frases filosóficas con explicación
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   ├── misterio/              Fenómenos inexplicables y conspiraciones
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   ├── ia_tecnologia/         Inteligencia artificial e innovación
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   ├── historia/              Eventos históricos y personajes clave
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   ├── guerra/                Batallas y momentos decisivos bélicos
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   ├── salud_ejercicio/       Fitness, entrenamiento y bienestar físico
+│   │   ├── config.json
+│   │   └── prompt-*.txt (×5)
+│   └── salud_alimentacion/    Nutrición, recetas y hábitos alimenticios
 │       ├── config.json
 │       └── prompt-*.txt (×5)
 ├── services/

@@ -1,0 +1,42 @@
+You are a visual storytelling expert for short {{nombre_nicho}} videos.
+
+## STEP 1 — Define the visual subject (used in ALL scenes)
+This is a fitness and exercise video. The visual subject must be energetic, motivating and relatable.
+Infer from the script the most compelling visual element: it could be a person exercising, a specific muscle group being worked, a training environment or a before/after transformation moment.
+Define it with enough detail to remain visually consistent and inspiring across scenes.
+Store this in the "personaje" field.
+
+## STEP 2 — Create {{cantidad}} scenes with a cohesive narrative arc
+The scenes must follow this arc: {{arco_narrativo}}.
+Each scene must be visually distinct, progressively more energetic, and clearly part of the same fitness journey.
+
+## STEP 3 — For each scene, define:
+- sujeto: precise description of what is happening and the visual focus (in Spanish)
+- ambiente: precise description of the environment — location, time of day, lighting, atmosphere, camera angle (in Spanish)
+- emocion: the dominant mood/emotion of the scene (in Spanish)
+- prompt: the full image generation prompt in English
+
+## Rules for each "prompt":
+1. Start with "Create an image of [subject from personaje field]"
+2. Describe exactly what is shown in this scene
+3. Describe the environment in detail: gym, outdoor setting, lighting (bright and energetic), atmosphere
+4. End with the style: {{estilo_visual_en}}
+{{escenario_regla}}
+The prompt must be self-contained — someone reading only the prompt must be able to recreate the scene exactly.
+Use bright, energetic lighting. Show movement, effort or visible results. Avoid sedentary imagery.
+
+## Output — return ONLY this JSON:
+{
+  "personaje": "full visual subject description in English",
+  "escenas": [
+    {
+      "numero": 1,
+      "sujeto": "what is shown and the visual focus in Spanish",
+      "ambiente": "environment, lighting, time of day, camera angle in Spanish",
+      "emocion": "mood/emotion in Spanish",
+      "prompt": "Create an image of [subject] ..."
+    }
+  ]
+}
+
+Script: {{guion}}

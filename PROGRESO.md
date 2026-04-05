@@ -154,11 +154,12 @@ const ttsFinal  = tts    || nichoConfig.defaults.tts || 'google';
 | `motivacion` | Motivación | ✅ Listo (config + prompts) |
 | `curiosidades` | Curiosidades | ✅ Listo (config + prompts) |
 | `filosofia` | Filosofía | ✅ Listo (config + prompts) |
-
-## Nichos planificados para agregar después
-- `misterio`
-- `ia_tecnologia`
-- `filosofia`
+| `misterio` | Misterio | ✅ Listo (config + prompts) |
+| `ia_tecnologia` | IA y Tecnología | ✅ Listo (config + prompts) |
+| `historia` | Historia | ✅ Listo (config + prompts) |
+| `guerra` | Guerra | ✅ Listo (config + prompts) |
+| `salud_ejercicio` | Salud y Ejercicio | ✅ Listo (config + prompts) |
+| `salud_alimentacion` | Alimentación y Recetas | ✅ Listo (config + prompts) |
 
 ---
 
