@@ -270,6 +270,16 @@
       <option value="">Cargando nichos…</option>
     </select>
 
+    <label for="idiomaSelect" style="margin-top:18px">Idioma</label>
+    <select id="idiomaSelect">
+      <option value="">— mismo que el nicho —</option>
+      <option value="es">Español</option>
+      <option value="en">Inglés</option>
+      <option value="de">Alemán</option>
+      <option value="fr">Francés</option>
+      <option value="pt">Portugués</option>
+    </select>
+
     <label for="tema" style="margin-top:18px">Tema del guion</label>
     <textarea id="tema" rows="3" placeholder="Ej: la disciplina como habito diario..."></textarea>
 
@@ -440,9 +450,10 @@ document.getElementById('btnGenerar').addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tema,
-        nicho: document.getElementById('nichoSelect').value || 'motivacion',
+        nicho:  document.getElementById('nichoSelect').value || 'motivacion',
+        idioma: document.getElementById('idiomaSelect').value || undefined,
         genero: vozSeleccionada,
-        tts: ttsSeleccionado,
+        tts:    ttsSeleccionado,
       }),
     });
     const { id, error } = await resp.json();
