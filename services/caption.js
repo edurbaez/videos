@@ -17,6 +17,7 @@ async function generarCaption(guion, nichoConfig) {
   const prompt = renderPrompt(nichoConfig.prompts.caption, {
     guion,
     nombre_nicho:   nichoConfig.nombre,
+    idioma:         nichoConfig.idioma,
     caption_estilo: nichoConfig.caption.estilo,
     cta:            nichoConfig.caption.ctaDefault,
     hashtags_base:  joinHashtags(nichoConfig.caption.hashtagsBase),

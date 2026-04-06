@@ -9,5 +9,6 @@ Reglas:
 - Tono: {{caption_estilo}}.
 - Incluye este CTA si encaja naturalmente: {{cta}}.
 - Usa como base estos hashtags: {{hashtags_base}}.
+- Escribe el caption en este idioma: {{idioma}}.
 - No expliques nada.
 - Devuelve solo el caption final.

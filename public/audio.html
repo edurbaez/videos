@@ -228,6 +228,26 @@
       color: #fca5a5;
     }
 
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+    select:focus { border-color: var(--accent); }
+    select option { background: var(--surface2); }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -245,7 +265,12 @@
   <p class="subtitle">Escribe el tema, elige la voz y genera el guion + audio → Telegram.</p>
 
   <div class="card">
-    <label for="tema">Tema del guion</label>
+    <label for="nichoSelect">Nicho</label>
+    <select id="nichoSelect">
+      <option value="">Cargando nichos…</option>
+    </select>
+
+    <label for="tema" style="margin-top:18px">Tema del guion</label>
     <textarea id="tema" rows="3" placeholder="Ej: la disciplina como habito diario..."></textarea>
 
     <div class="voice-label" style="margin-top:20px">Proveedor TTS</div>
@@ -316,6 +341,35 @@
 <script>
 let vozSeleccionada = 'femenino';
 let ttsSeleccionado = 'google';
+let nichosData = [];
+
+// Carga nichos desde el servidor y aplica los defaults del primero
+async function cargarNichos() {
+  try {
+    const res = await fetch('/nichos');
+    nichosData = await res.json();
+    const sel = document.getElementById('nichoSelect');
+    sel.innerHTML = nichosData.map(n =>
+      `<option value="${n.id}">${n.nombre} — ${n.descripcion}</option>`
+    ).join('');
+    if (nichosData.length) aplicarDefaults(nichosData[0]);
+  } catch (e) {
+    document.getElementById('nichoSelect').innerHTML = '<option value="">Error al cargar nichos</option>';
+  }
+}
+
+function aplicarDefaults(nicho) {
+  const d = nicho.defaults || {};
+  if (d.tts)  selectTTS(d.tts);
+  if (d.voz)  selectVoz(d.voz);
+}
+
+document.getElementById('nichoSelect').addEventListener('change', function () {
+  const nicho = nichosData.find(n => n.id === this.value);
+  if (nicho) aplicarDefaults(nicho);
+});
+
+cargarNichos();
 
 function selectTTS(proveedor) {
   ttsSeleccionado = proveedor;
@@ -384,7 +438,12 @@ document.getElementById('btnGenerar').addEventListener('click', async () => {
     const resp = await fetch('/util/audio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema, genero: vozSeleccionada, tts: ttsSeleccionado }),
+      body: JSON.stringify({
+        tema,
+        nicho: document.getElementById('nichoSelect').value || 'motivacion',
+        genero: vozSeleccionada,
+        tts: ttsSeleccionado,
+      }),
     });
     const { id, error } = await resp.json();
     if (error) throw new Error(error);

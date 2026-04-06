@@ -9,6 +9,7 @@ Reglas:
 - Tono: {{caption_estilo}}.
 - Incluye este CTA si encaja naturalmente: {{cta}}.
 - Usa como base estos hashtags: {{hashtags_base}}.
+- Escribe el caption en este idioma: {{idioma}}.
 - El caption debe transmitir el peso del evento bélico sin glorificar la violencia.
 - No expliques nada.
 - Devuelve solo el caption final.

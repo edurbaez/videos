@@ -133,7 +133,7 @@ app.post('/generar', async (req, res) => {
         }),
 
         // Audio → (Subtítulos si están activados)
-        generarAudio(guion_audio, rutaAudio(id), vozFinal, ttsFinal).then(async () => {
+        generarAudio(guion_audio, rutaAudio(id), vozFinal, ttsFinal, nichoConfig.idioma).then(async () => {
           emitirEvento(id, 'audio_listo', { ruta: `/output/audios/audio-${id}.mp3` });
           if (!subtitulos) {
             emitirEvento(id, 'subtitulos_listos', {});
@@ -338,7 +338,7 @@ app.get('/util/audio-progress/:id', (req, res) => {
 // ── POST /util/audio — Tema → Guion → Audio Google TTS → Telegram ─────────────
 app.post('/util/audio', async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema, genero = 'masculino', tts = 'google' } = req.body;
+  const { tema, nicho = 'motivacion', genero, tts, idioma } = req.body;
   if (!tema?.trim()) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
   const id = 'audio-' + uuidv4();
@@ -351,17 +351,20 @@ app.post('/util/audio', async (req, res) => {
     };
 
     try {
-      const nichoConfig = cargarNicho('motivacion');
+      const nichoConfig = cargarNicho(nicho);
+      if (idioma) nichoConfig.idioma = idioma;
+      const generoFinal = genero || nichoConfig.defaults.voz  || 'masculino';
+      const ttsFinal    = tts    || nichoConfig.defaults.tts  || 'google';
       // Paso 1: Guion
       emit('progreso', { paso: 1, mensaje: 'Generando guion...' });
       const { guion_final, guion_audio } = await generarGuion(tema, id, nichoConfig);
       emit('guion_listo', { guion: guion_final });
 
       // Paso 2: Audio
-      const proveedorNombre = tts === 'openai' ? 'OpenAI TTS' : 'Google TTS';
-      emit('progreso', { paso: 2, mensaje: `Generando audio (voz ${genero}, ${proveedorNombre})...` });
+      const proveedorNombre = ttsFinal === 'openai' ? 'OpenAI TTS' : 'Google TTS';
+      emit('progreso', { paso: 2, mensaje: `Generando audio (voz ${generoFinal}, ${proveedorNombre})...` });
       const ruta = rutaAudio(id);
-      await generarAudio(guion_audio, ruta, genero, tts);
+      await generarAudio(guion_audio, ruta, generoFinal, ttsFinal, nichoConfig.idioma);
       const urlAudio = `/output/audios/audio-${id}.mp3`;
       emit('audio_listo', { url: urlAudio });
 

@@ -13,10 +13,21 @@ async function obtenerTokenTTS() {
   return token;
 }
 
-// Voces Google TTS disponibles por genero
+// Voces Google TTS disponibles por idioma y genero
 const VOCES_GOOGLE = {
-  masculino: 'es-US-Neural2-B',
-  femenino:  'es-US-Neural2-A',
+  'es': { masculino: 'es-US-Neural2-B', femenino: 'es-US-Neural2-A' },
+  'de': { masculino: 'de-DE-Neural2-B', femenino: 'de-DE-Neural2-A' },
+  'en': { masculino: 'en-US-Neural2-D', femenino: 'en-US-Neural2-F' },
+  'fr': { masculino: 'fr-FR-Neural2-B', femenino: 'fr-FR-Neural2-A' },
+  'pt': { masculino: 'pt-BR-Neural2-B', femenino: 'pt-BR-Neural2-A' },
+};
+
+const LANG_CODE_GOOGLE = {
+  'es': 'es-US',
+  'de': 'de-DE',
+  'en': 'en-US',
+  'fr': 'fr-FR',
+  'pt': 'pt-BR',
 };
 
 // Voces OpenAI TTS disponibles por genero
@@ -25,10 +36,12 @@ const VOCES_OPENAI = {
   femenino:  'nova',
 };
 
-async function generarAudioGoogle(texto, rutaDestino, genero) {
+async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es') {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const nombreVoz = VOCES_GOOGLE[genero] || VOCES_GOOGLE.masculino;
-  console.log(`[${ts()}] Audio: sintetizando con Google TTS — voz: ${nombreVoz} (${texto.length} chars)...`);
+  const vocesIdioma = VOCES_GOOGLE[idioma] || VOCES_GOOGLE['es'];
+  const nombreVoz   = vocesIdioma[genero]  || vocesIdioma.masculino;
+  const langCode    = LANG_CODE_GOOGLE[idioma] || 'es-US';
+  console.log(`[${ts()}] Audio: sintetizando con Google TTS — voz: ${nombreVoz} lang: ${langCode} (${texto.length} chars)...`);
 
   // Google TTS permite máx 5000 bytes por petición
   const textoTruncado = Buffer.byteLength(texto, 'utf8') > 4800
@@ -43,7 +56,7 @@ async function generarAudioGoogle(texto, rutaDestino, genero) {
       'https://texttospeech.googleapis.com/v1/text:synthesize',
       {
         input: { text: textoTruncado },
-        voice: { languageCode: 'es-US', name: nombreVoz },
+        voice: { languageCode: langCode, name: nombreVoz },
         audioConfig: { audioEncoding: 'MP3' },
       },
       {
@@ -111,11 +124,11 @@ async function generarAudioOpenAI(texto, rutaDestino, genero) {
  * @param {string} [tts]        - 'google' | 'openai' (default: 'google')
  * @returns {string} - Ruta del archivo de audio guardado
  */
-async function generarAudio(texto, rutaDestino, genero = 'masculino', tts = 'google') {
+async function generarAudio(texto, rutaDestino, genero = 'masculino', tts = 'google', idioma = 'es') {
   if (tts === 'openai') {
     return generarAudioOpenAI(texto, rutaDestino, genero);
   }
-  return generarAudioGoogle(texto, rutaDestino, genero);
+  return generarAudioGoogle(texto, rutaDestino, genero, idioma);
 }
 
 module.exports = { generarAudio };
