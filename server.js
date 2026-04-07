@@ -338,7 +338,7 @@ app.get('/util/audio-progress/:id', (req, res) => {
 // ── POST /util/audio — Tema → Guion → Audio Google TTS → Telegram ─────────────
 app.post('/util/audio', async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema, nicho = 'motivacion', genero, tts, idioma } = req.body;
+  const { tema, nicho = 'motivacion', genero, tts, idioma, voz } = req.body;
   if (!tema?.trim()) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
   const id = 'audio-' + uuidv4();
@@ -364,7 +364,7 @@ app.post('/util/audio', async (req, res) => {
       const proveedorNombre = ttsFinal === 'openai' ? 'OpenAI TTS' : 'Google TTS';
       emit('progreso', { paso: 2, mensaje: `Generando audio (voz ${generoFinal}, ${proveedorNombre})...` });
       const ruta = rutaAudio(id);
-      await generarAudio(guion_audio, ruta, generoFinal, ttsFinal, nichoConfig.idioma);
+      await generarAudio(guion_audio, ruta, generoFinal, ttsFinal, nichoConfig.idioma, voz);
       const urlAudio = `/output/audios/audio-${id}.mp3`;
       emit('audio_listo', { url: urlAudio });
 

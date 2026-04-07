@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audios en Alemán</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0f;
+      --surface: #18181c;
+      --surface2:#222228;
+      --border:  #2e2e38;
+      --accent:  #d97706;
+      --accent2: #f59e0b;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    .nav {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .nav a:hover { color: var(--text); border-color: var(--accent); }
+    .nav a.active { color: var(--accent2); border-color: var(--accent2); }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #fb923c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
+    .lang-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      background: #92400e22;
+      border: 1px solid #d97706;
+      color: #fbbf24;
+      border-radius: 20px;
+      padding: 4px 12px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+    select:focus { border-color: var(--accent); }
+    select option { background: var(--surface2); }
+
+    .voice-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .voice-selector {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .voice-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .voice-btn:hover { border-color: var(--accent); color: var(--text); }
+    .voice-btn.selected-fem {
+      border-color: #ec4899;
+      background: #ec489918;
+      color: #f9a8d4;
+    }
+    .voice-btn.selected-mas {
+      border-color: #3b82f6;
+      background: #3b82f618;
+      color: #93c5fd;
+    }
+    .voice-btn.selected-google {
+      border-color: #4285f4;
+      background: #4285f422;
+      color: #93c5fd;
+    }
+    .voice-btn.selected-openai {
+      border-color: #10a37f;
+      background: #10a37f22;
+      color: #6ee7b7;
+    }
+
+    .btn-gen {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      transition: opacity 0.2s;
+    }
+    .btn-gen:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Pasos de progreso */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 20px;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      transition: all 0.3s;
+    }
+    .step.active { background: #78350f18; color: var(--accent2); }
+    .step.done   { color: var(--success); }
+    .step.error  { color: #fca5a5; }
+    .step-icon { font-size: 1.1rem; min-width: 24px; text-align: center; }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid #ffffff22;
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Resultado */
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .copy-wrap { position: relative; }
+    .copy-wrap textarea { padding-right: 72px; }
+    .btn-copy {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .btn-copy:hover { color: var(--text); }
+
+    audio {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+      background: var(--surface2);
+    }
+
+    .tg-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #15803d22;
+      border: 1px solid var(--success);
+      color: var(--success);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .tg-badge-error {
+      background: #7f1d1d44;
+      border-color: var(--error);
+      color: #fca5a5;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 18px 0;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <nav class="nav">
+    <a href="/index.html">Inicio</a>
+    <a href="/guion.html">Guion</a>
+    <a href="/imagenes.html">Imagenes</a>
+    <a href="/audio.html">Audio</a>
+    <a href="/audios-de-aleman.html" class="active">🇩🇪 Alemán</a>
+  </nav>
+
+  <h1>Audios en Alemán</h1>
+  <p class="subtitle">Genera guiones en alemán con voces nativas y envíalos a Telegram.</p>
+  <div class="lang-badge">🇩🇪 Idioma fijo: Deutsch (de)</div>
+
+  <div class="card">
+    <label for="nichoSelect">Nicho</label>
+    <select id="nichoSelect">
+      <option value="">Cargando nichos…</option>
+    </select>
+
+    <label for="tema" style="margin-top:18px">Tema del guion</label>
+    <textarea id="tema" rows="3" placeholder="Ej: Disziplin als tägliche Gewohnheit…"></textarea>
+    <p class="hint">El guion se generará completamente en alemán.</p>
+
+    <div class="divider"></div>
+
+    <div class="voice-label">Proveedor TTS</div>
+    <div class="voice-selector">
+      <button class="voice-btn selected-google" id="btnGoogle" onclick="selectTTS('google')">
+        <span style="font-size:1.2rem">🔵</span>
+        Google TTS
+      </button>
+      <button class="voice-btn" id="btnOpenAI" onclick="selectTTS('openai')">
+        <span style="font-size:1.2rem">🟢</span>
+        OpenAI TTS
+      </button>
+    </div>
+
+    <div class="voice-label" style="margin-top:18px">Voz</div>
+    <div class="voice-selector">
+      <button class="voice-btn selected-fem" id="btnFem" onclick="selectVoz('femenino')">
+        <span style="font-size:1.4rem">&#9792;</span>
+        Femenina
+      </button>
+      <button class="voice-btn" id="btnMas" onclick="selectVoz('masculino')">
+        <span style="font-size:1.4rem">&#9794;</span>
+        Masculina
+      </button>
+    </div>
+
+    <!-- Selector de voz Google específica para alemán -->
+    <div id="googleVoiceWrap" style="margin-top:18px">
+      <label for="googleVoiceSelect">Voz Google (alemán)</label>
+      <select id="googleVoiceSelect">
+        <option value="">— usar default del nicho —</option>
+        <optgroup label="Femeninas">
+          <option value="de-DE-Neural2-A">de-DE-Neural2-A — Femenina natural</option>
+          <option value="de-DE-Neural2-C">de-DE-Neural2-C — Femenina cálida</option>
+          <option value="de-DE-Neural2-F">de-DE-Neural2-F — Femenina expresiva</option>
+          <option value="de-DE-Polyglot-1">de-DE-Polyglot-1 — Femenina multiidioma</option>
+        </optgroup>
+        <optgroup label="Masculinas">
+          <option value="de-DE-Neural2-B">de-DE-Neural2-B — Masculina profunda</option>
+          <option value="de-DE-Neural2-D">de-DE-Neural2-D — Masculina clara</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <!-- Selector de voz OpenAI -->
+    <div id="openaiVoiceWrap" class="hidden" style="margin-top:18px">
+      <label for="openaiVoiceSelect">Voz OpenAI</label>
+      <select id="openaiVoiceSelect">
+        <option value="">— usar default del nicho —</option>
+        <option value="alloy">alloy — Neutra</option>
+        <option value="echo">echo — Masculina suave</option>
+        <option value="fable">fable — Masculina narrativa</option>
+        <option value="onyx">onyx — Masculina grave</option>
+        <option value="nova">nova — Femenina enérgica</option>
+        <option value="shimmer">shimmer — Femenina cálida</option>
+      </select>
+    </div>
+
+    <button class="btn-gen" id="btnGenerar">
+      🇩🇪 Generar audio en alemán → Telegram
+    </button>
+  </div>
+
+  <!-- Progreso -->
+  <div class="hidden" id="cardProgreso">
+    <div class="steps">
+      <div class="step" id="paso1">
+        <span class="step-icon" id="ico1">&#9679;</span>
+        <span id="txt1">Generando guion en alemán...</span>
+      </div>
+      <div class="step" id="paso2">
+        <span class="step-icon" id="ico2">&#9679;</span>
+        <span id="txt2">Sintetizando voz...</span>
+      </div>
+      <div class="step" id="paso3">
+        <span class="step-icon" id="ico3">&#9679;</span>
+        <span id="txt3">Enviando a Telegram...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resultado -->
+  <div class="card hidden" id="cardResultado">
+    <div id="tgBadge" class="tg-badge">
+      <span>&#9989;</span> Audio en alemán enviado a Telegram
+    </div>
+
+    <div class="section-title">Guion generado (Deutsch)</div>
+    <div class="copy-wrap" style="margin-bottom:20px">
+      <textarea id="outGuion" rows="9" readonly></textarea>
+      <button class="btn-copy" onclick="copiar('outGuion', this)">Copiar</button>
+    </div>
+
+    <div class="section-title">Audio</div>
+    <audio id="audioPlayer" controls src=""></audio>
+  </div>
+
+</div>
+
+<script>
+  // ── Estado interno ────────────────────────────────────────────────────────
+  let vozSeleccionada = 'femenino';
+  let ttsSeleccionado = 'google';
+  let nichosData = [];
+  let es = null;
+
+  // ── Carga de nichos ───────────────────────────────────────────────────────
+  async function cargarNichos() {
+    try {
+      const res = await fetch('/nichos');
+      nichosData = await res.json();
+      const sel = document.getElementById('nichoSelect');
+      sel.innerHTML = nichosData.map(n =>
+        `<option value="${n.id}">${n.nombre} — ${n.descripcion}</option>`
+      ).join('');
+    } catch {
+      document.getElementById('nichoSelect').innerHTML =
+        '<option value="">Error al cargar nichos</option>';
+    }
+  }
+
+  cargarNichos();
+
+  // ── Selección de TTS ──────────────────────────────────────────────────────
+  function selectTTS(proveedor) {
+    ttsSeleccionado = proveedor;
+    const btnG = document.getElementById('btnGoogle');
+    const btnO = document.getElementById('btnOpenAI');
+    const googleWrap  = document.getElementById('googleVoiceWrap');
+    const openaiWrap  = document.getElementById('openaiVoiceWrap');
+
+    btnG.className = 'voice-btn' + (proveedor === 'google' ? ' selected-google' : '');
+    btnO.className = 'voice-btn' + (proveedor === 'openai' ? ' selected-openai' : '');
+
+    if (proveedor === 'google') {
+      googleWrap.classList.remove('hidden');
+      openaiWrap.classList.add('hidden');
+    } else {
+      openaiWrap.classList.remove('hidden');
+      googleWrap.classList.add('hidden');
+    }
+  }
+
+  // ── Selección de género de voz ────────────────────────────────────────────
+  function selectVoz(voz) {
+    vozSeleccionada = voz;
+    document.getElementById('btnFem').className =
+      'voice-btn' + (voz === 'femenino' ? ' selected-fem' : '');
+    document.getElementById('btnMas').className =
+      'voice-btn' + (voz === 'masculino' ? ' selected-mas' : '');
+  }
+
+  // ── Helpers UI ────────────────────────────────────────────────────────────
+  function copiar(id, btn) {
+    navigator.clipboard.writeText(document.getElementById(id).value).then(() => {
+      btn.textContent = 'Copiado';
+      setTimeout(() => btn.textContent = 'Copiar', 1500);
+    });
+  }
+
+  function setPaso(n, estado) {
+    const paso = document.getElementById(`paso${n}`);
+    const ico  = document.getElementById(`ico${n}`);
+    paso.className = 'step ' + estado;
+    if (estado === 'active') {
+      ico.innerHTML = '<div class="spinner"></div>';
+    } else if (estado === 'done') {
+      ico.textContent = '✓';
+    } else if (estado === 'error') {
+      ico.textContent = '✗';
+    } else {
+      ico.textContent = '●';
+    }
+  }
+
+  // ── Construir payload con voz alemana específica ──────────────────────────
+  function buildPayload() {
+    const tema  = document.getElementById('tema').value.trim();
+    const nicho = document.getElementById('nichoSelect').value || 'motivacion';
+
+    // voz específica según proveedor
+    const vozGoogle  = document.getElementById('googleVoiceSelect').value;
+    const vozOpenAI  = document.getElementById('openaiVoiceSelect').value;
+    const vozEspecifica = ttsSeleccionado === 'google' ? vozGoogle : vozOpenAI;
+
+    const payload = {
+      tema,
+      nicho,
+      idioma: 'de',          // siempre alemán
+      genero: vozSeleccionada,
+      tts:    ttsSeleccionado,
+    };
+
+    // si el usuario eligió una voz específica la inyectamos
+    if (vozEspecifica) payload.voz = vozEspecifica;
+
+    return payload;
+  }
+
+  // ── Generación ────────────────────────────────────────────────────────────
+  document.getElementById('btnGenerar').addEventListener('click', async () => {
+    const tema = document.getElementById('tema').value.trim();
+    if (!tema) {
+      alert('Schreibe das Thema / Escribe el tema antes de continuar.');
+      return;
+    }
+
+    if (es) { es.close(); es = null; }
+
+    const btn = document.getElementById('btnGenerar');
+    btn.disabled = true;
+    btn.textContent = 'Verarbeitend… / Procesando...';
+
+    // Reset UI
+    document.getElementById('cardResultado').classList.add('hidden');
+    document.getElementById('cardProgreso').classList.remove('hidden');
+    [1, 2, 3].forEach(n => setPaso(n, ''));
+    setPaso(1, 'active');
+
+    try {
+      const resp = await fetch('/util/audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      });
+
+      const { id, error } = await resp.json();
+      if (error) throw new Error(error);
+
+      es = new EventSource(`/util/audio-progress/${id}`);
+
+      es.addEventListener('progreso', e => {
+        const { paso } = JSON.parse(e.data);
+        if (paso > 1) setPaso(paso - 1, 'done');
+        setPaso(paso, 'active');
+      });
+
+      es.addEventListener('guion_listo', e => {
+        const { guion } = JSON.parse(e.data);
+        document.getElementById('outGuion').value = guion;
+      });
+
+      es.addEventListener('audio_listo', e => {
+        const { url } = JSON.parse(e.data);
+        document.getElementById('audioPlayer').src = url;
+      });
+
+      es.addEventListener('finalizado', e => {
+        const { url, guion } = JSON.parse(e.data);
+        es.close(); es = null;
+
+        [1, 2, 3].forEach(n => setPaso(n, 'done'));
+
+        document.getElementById('outGuion').value = guion;
+        document.getElementById('audioPlayer').src = url;
+
+        const badge = document.getElementById('tgBadge');
+        badge.className = 'tg-badge';
+        badge.innerHTML = '<span>&#9989;</span> Audio en alemán enviado a Telegram';
+
+        document.getElementById('cardResultado').classList.remove('hidden');
+        document.getElementById('cardResultado').scrollIntoView({ behavior: 'smooth' });
+
+        btn.disabled = false;
+        btn.textContent = '🇩🇪 Generar audio en alemán → Telegram';
+      });
+
+      es.addEventListener('error', e => {
+        let datos = {};
+        try { datos = JSON.parse(e.data || '{}'); } catch (_) {}
+
+        [1, 2, 3].forEach(n => {
+          if (document.getElementById(`paso${n}`).classList.contains('active'))
+            setPaso(n, 'error');
+        });
+
+        const badge = document.getElementById('tgBadge');
+        badge.className = 'tg-badge tg-badge-error';
+        badge.innerHTML = '<span>&#10060;</span> ' + (datos.mensaje || 'Fehler / Error desconocido');
+        document.getElementById('cardResultado').classList.remove('hidden');
+
+        if (es) { es.close(); es = null; }
+        btn.disabled = false;
+        btn.textContent = '🇩🇪 Generar audio en alemán → Telegram';
+      });
+
+    } catch (err) {
+      alert('Error: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = '🇩🇪 Generar audio en alemán → Telegram';
+    }
+  });
+</script>
+</body>
+</html>

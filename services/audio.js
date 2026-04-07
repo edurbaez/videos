@@ -36,10 +36,10 @@ const VOCES_OPENAI = {
   femenino:  'nova',
 };
 
-async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es') {
+async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es', vozEspecifica) {
   const ts = () => new Date().toTimeString().slice(0, 8);
   const vocesIdioma = VOCES_GOOGLE[idioma] || VOCES_GOOGLE['es'];
-  const nombreVoz   = vocesIdioma[genero]  || vocesIdioma.masculino;
+  const nombreVoz   = vozEspecifica || vocesIdioma[genero] || vocesIdioma.masculino;
   const langCode    = LANG_CODE_GOOGLE[idioma] || 'es-US';
   console.log(`[${ts()}] Audio: sintetizando con Google TTS — voz: ${nombreVoz} lang: ${langCode} (${texto.length} chars)...`);
 
@@ -79,9 +79,9 @@ async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es') {
   return rutaDestino;
 }
 
-async function generarAudioOpenAI(texto, rutaDestino, genero) {
+async function generarAudioOpenAI(texto, rutaDestino, genero, vozEspecifica) {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const voz = VOCES_OPENAI[genero] || VOCES_OPENAI.masculino;
+  const voz = vozEspecifica || VOCES_OPENAI[genero] || VOCES_OPENAI.masculino;
   console.log(`[${ts()}] Audio: sintetizando con OpenAI TTS — voz: ${voz} (${texto.length} chars)...`);
 
   let resp;
@@ -124,11 +124,11 @@ async function generarAudioOpenAI(texto, rutaDestino, genero) {
  * @param {string} [tts]        - 'google' | 'openai' (default: 'google')
  * @returns {string} - Ruta del archivo de audio guardado
  */
-async function generarAudio(texto, rutaDestino, genero = 'masculino', tts = 'google', idioma = 'es') {
+async function generarAudio(texto, rutaDestino, genero = 'masculino', tts = 'google', idioma = 'es', vozEspecifica) {
   if (tts === 'openai') {
-    return generarAudioOpenAI(texto, rutaDestino, genero);
+    return generarAudioOpenAI(texto, rutaDestino, genero, vozEspecifica);
   }
-  return generarAudioGoogle(texto, rutaDestino, genero, idioma);
+  return generarAudioGoogle(texto, rutaDestino, genero, idioma, vozEspecifica);
 }
 
 module.exports = { generarAudio };
