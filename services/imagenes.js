@@ -1,5 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
+const FormData = require('form-data');
+const path = require('path');
 const { execSync } = require('child_process');
 const { GoogleAuth } = require('google-auth-library');
 require('dotenv').config();
@@ -8,6 +10,7 @@ const { rutaImagen } = require('../utils/archivos');
 const { ESTILOS_ES, ESTILOS_EN, ESCENARIOS_EN } = require('../utils/estilos');
 const { generarStoryboard } = require('./storyboard');
 const { renderPrompt } = require('../utils/prompts');
+const { validarModelo } = require('../middleware/seguridad');
 
 // Galería en memoria: persiste mientras el servidor esté corriendo
 const galeria = [];
@@ -61,50 +64,20 @@ async function generarPromptVisual(guion, n, total, estilo = 'cinematico', escen
 }
 
 /**
- * Llama a DALL-E 3 para generar una imagen a partir de un prompt visual.
- * Retorna el buffer PNG o lanza un error.
+ * Llama a OpenAI Images (gpt-image-1, gpt-image-1-mini) con modelo configurable.
+ * Modelos soportados: gpt-image-1, gpt-image-1-mini
+ * Size portrait 9:16 → 1024x1536 (gpt-image-1 no soporta 1024x1792 de DALL-E 3)
+ * Quality: low | medium | high
  *
  * @param {string} promptVisual - Prompt en inglés
+ * @param {string} modelo       - Modelo a usar (default: gpt-image-1)
+ * @param {string} quality      - Calidad: low | medium | high (default: medium)
  * @returns {Buffer} - Buffer de la imagen PNG
  */
-async function llamarDallE(promptVisual) {
-  let resp;
-  try {
-    resp = await axios.post(
-      'https://api.openai.com/v1/images/generations',
-      {
-        model: 'dall-e-3',
-        prompt: promptVisual,
-        n: 1,
-        size: '1024x1792',
-        quality: 'standard',
-        response_format: 'b64_json',
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-  } catch (err) {
-    const detalle = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-    console.error('[DALL-E] Error HTTP:', err.response?.status, detalle);
-    throw new Error(`DALL-E HTTP ${err.response?.status}: ${detalle}`);
-  }
-
-  const b64 = resp.data.data[0]?.b64_json;
-  if (!b64) throw new Error('DALL-E no devolvió imagen en la respuesta.');
-  console.log('[DALL-E] Imagen generada correctamente.');
-  return Buffer.from(b64, 'base64');
-}
-
-/**
- * Llama a OpenAI Images (DALL-E 3 o DALL-E 2) con modelo configurable.
- * DALL-E 3 usa 1024x1792 (9:16); DALL-E 2 usa 1024x1024.
- */
-async function llamarOpenAIImagen(promptVisual, modelo = 'dall-e-3') {
-  const size = modelo === 'dall-e-3' ? '1024x1792' : '1024x1024';
+async function llamarOpenAIImagen(promptVisual, modelo = 'gpt-image-1', quality = 'medium') {
+  validarModelo(modelo, 'openai');
+  // gpt-image-1 y gpt-image-1-mini usan 1024x1536 para portrait (9:16 aproximado)
+  const size = '1024x1536';
   let resp;
   try {
     resp = await axios.post(
@@ -114,8 +87,8 @@ async function llamarOpenAIImagen(promptVisual, modelo = 'dall-e-3') {
         prompt: promptVisual,
         n: 1,
         size,
-        response_format: 'b64_json',
-        ...(modelo === 'dall-e-3' ? { quality: 'standard' } : {}),
+        quality,
+        output_format: 'png',
       },
       {
         headers: {
@@ -130,6 +103,56 @@ async function llamarOpenAIImagen(promptVisual, modelo = 'dall-e-3') {
   }
   const b64 = resp.data.data[0]?.b64_json;
   if (!b64) throw new Error('OpenAI no devolvió imagen en la respuesta.');
+  console.log(`[OpenAI Imagen] ${modelo} (${quality}) generada correctamente.`);
+  return Buffer.from(b64, 'base64');
+}
+
+/**
+ * Llama a OpenAI Images Edits (/v1/images/edits) con una imagen de referencia.
+ * Úsalo cuando se quiera mantener consistencia de estilo/personaje entre imágenes.
+ *
+ * @param {string} promptVisual  - Prompt en inglés
+ * @param {string} refImagePath  - Ruta local de la imagen de referencia
+ * @param {string} modelo        - Modelo (gpt-image-1 | gpt-image-1-mini)
+ * @param {string} quality       - Calidad: low | medium | high
+ * @returns {Buffer} - Buffer de la imagen PNG
+ */
+async function llamarOpenAIImagenEdits(promptVisual, refImagePath, modelo = 'gpt-image-1', quality = 'medium') {
+  validarModelo(modelo, 'openai');
+  const form = new FormData();
+  const ext = path.extname(refImagePath).toLowerCase();
+  const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.png': 'image/png' };
+  const mime = mimeMap[ext] || 'image/png';
+
+  form.append('image[]', fs.createReadStream(refImagePath), { filename: `referencia${ext}`, contentType: mime });
+  form.append('prompt', promptVisual);
+  form.append('model', modelo);
+  form.append('n', '1');
+  form.append('size', '1024x1536');
+  form.append('quality', quality);
+  form.append('output_format', 'png');
+
+  let resp;
+  try {
+    resp = await axios.post(
+      'https://api.openai.com/v1/images/edits',
+      form,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          ...form.getHeaders(),
+        },
+        maxBodyLength: Infinity,
+      }
+    );
+  } catch (err) {
+    const detalle = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+    throw new Error(`OpenAI Edits (${modelo}) HTTP ${err.response?.status}: ${detalle}`);
+  }
+
+  const b64 = resp.data.data[0]?.b64_json;
+  if (!b64) throw new Error('OpenAI Edits no devolvió imagen en la respuesta.');
+  console.log(`[OpenAI Edits] ${modelo} (${quality}) con referencia generada correctamente.`);
   return Buffer.from(b64, 'base64');
 }
 
@@ -151,6 +174,7 @@ async function obtenerAccessToken() {
  * Endpoint: https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{modelo}:predict
  */
 async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-002') {
+  validarModelo(modelo, 'google');
   const project  = process.env.GOOGLE_PROJECT_ID;
   const location = process.env.GOOGLE_LOCATION || 'us-central1';
   const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelo}:predict`;
@@ -196,7 +220,7 @@ async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-00
  * Genera N imágenes usando un prompt directo del usuario (sin pasar por GPT).
  * Soporta api='google' o api='openai'.
  */
-async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCadaImagen) {
+async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCadaImagen, refImagePath = null, quality = 'medium') {
   const ts = () => new Date().toTimeString().slice(0, 8);
   const rutas = [];
 
@@ -205,7 +229,8 @@ async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCada
     const ruta = rutaImagen(id, n);
     const urlPublica = `/output/imagenes/imagen-${id}-${n}.png`;
 
-    console.log(`[${ts()}] Imagen directa ${n}/${cantidad}: api=${api} modelo=${modelo}...`);
+    const modoRef = refImagePath && api !== 'google' ? ' +ref' : '';
+    console.log(`[${ts()}] Imagen directa ${n}/${cantidad}: api=${api} modelo=${modelo}${modoRef}...`);
 
     let guardada = false;
     for (let intento = 1; intento <= 2; intento++) {
@@ -213,8 +238,10 @@ async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCada
         let buffer;
         if (api === 'google') {
           buffer = await llamarGoogleImagen(prompt, modelo);
+        } else if (refImagePath) {
+          buffer = await llamarOpenAIImagenEdits(prompt, refImagePath, modelo, quality);
         } else {
-          buffer = await llamarOpenAIImagen(prompt, modelo);
+          buffer = await llamarOpenAIImagen(prompt, modelo, quality);
         }
         fs.writeFileSync(ruta, buffer);
         galeria.push({ id, numero: n, ruta, urlPublica, prompt, fecha: new Date().toISOString() });
@@ -262,7 +289,7 @@ function crearPlaceholder(ruta) {
  * @param {string} id       - UUID de la generación
  * @returns {string[]} - Array de rutas absolutas de las imágenes generadas
  */
-async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, onErrorImagen = null, nichoConfig) {
+async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, onErrorImagen = null, nichoConfig, refImagePath = null, quality = 'medium') {
   const ts = () => new Date().toTimeString().slice(0, 8);
   console.log(`[${ts()}] Imagenes: generando ${cantidad} imágenes para id ${id} (api=${api} modelo=${modelo} estilo=${estilo} escenario=${escenario} nicho=${nichoConfig.id})...`);
 
@@ -320,8 +347,10 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
         let buffer;
         if (api === 'google') {
           buffer = await llamarGoogleImagen(promptVisual, modelo);
+        } else if (refImagePath) {
+          buffer = await llamarOpenAIImagenEdits(promptVisual, refImagePath, modelo, quality);
         } else {
-          buffer = await llamarOpenAIImagen(promptVisual, modelo);
+          buffer = await llamarOpenAIImagen(promptVisual, modelo, quality);
         }
         fs.writeFileSync(ruta, buffer);
         console.log(`[${ts()}] Imagen ${n}/${cantidad}: guardada (intento ${intento})`);
@@ -401,7 +430,7 @@ async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escen
  * Genera imágenes una por una (secuencial).
  * Llama onCadaImagen(n, ruta, urlPublica) después de guardar cada una.
  */
-async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, nichoConfig) {
+async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, nichoConfig, modelo = 'gpt-image-1', quality = 'medium') {
   const ts = () => new Date().toTimeString().slice(0, 8);
 
   let prompts;
@@ -431,13 +460,13 @@ async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPr
     const prompt = prompts[i];
 
     if (onPrompt) onPrompt(n, prompt);
-    console.log(`[${ts()}] Imagen ${n}/${cantidad}: llamando DALL-E...`);
+    console.log(`[${ts()}] Imagen ${n}/${cantidad}: llamando OpenAI (${modelo}, ${quality})...`);
 
     let guardada = false;
 
     for (let intento = 1; intento <= 2; intento++) {
       try {
-        const buffer = await llamarDallE(prompt);
+        const buffer = await llamarOpenAIImagen(prompt, modelo, quality);
         fs.writeFileSync(ruta, buffer);
         galeria.push({ id, numero: n, ruta, urlPublica, prompt, fecha: new Date().toISOString() });
         console.log(`[${ts()}] Imagen ${n}/${cantidad}: guardada (intento ${intento}).`);

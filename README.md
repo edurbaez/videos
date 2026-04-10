@@ -31,7 +31,7 @@ Crear un archivo `.env` en la raíz del proyecto con el siguiente contenido:
 
 ```env
 # OpenAI — guion, caption y prompts visuales (GPT-4o / GPT-4o-mini)
-#         — imágenes opcionales (DALL-E 3 / DALL-E 2)
+#         — imágenes (gpt-image-1 / gpt-image-1-mini)
 OPENAI_API_KEY=sk-...
 
 # Google Cloud — TTS y generación de imágenes con Imagen 3 (Vertex AI)
@@ -60,7 +60,7 @@ PORT=3000
 2. Menu → **API Keys** → **Create new secret key**
 3. Copiar la clave generada (empieza con `sk-`)
 
-> Se usa para: guion (GPT-4o), caption y prompts visuales (GPT-4o-mini), imágenes (DALL-E 3 o DALL-E 2).
+> Se usa para: guion (GPT-4o), caption y prompts visuales (GPT-4o-mini), imágenes (gpt-image-1 / gpt-image-1-mini).
 
 ---
 
@@ -168,15 +168,15 @@ Cada nicho define su propio tono, prompts, voz por defecto y estilo narrativo. L
 
 | ID | Nombre | Voz default | TTS | Temas de ejemplo |
 |---|---|---|---|---|
-| `motivacion` | Motivación | femenino | google | "La disciplina supera al talento", "Empieza aunque no estés listo", "El fracaso es parte del proceso" |
-| `curiosidades` | Curiosidades | masculino | google | "Por qué bostezamos cuando vemos bostezar a alguien", "El idioma que desapareció en una generación", "La bacteria que sobrevivió en el espacio" |
-| `filosofia` | Filosofía | masculino | google | "No puedes bañarte dos veces en el mismo río (Heráclito)", "El hombre está condenado a ser libre (Sartre)", "Solo sé que no sé nada (Sócrates)" |
-| `misterio` | Misterio | masculino | google | "El triángulo de las Bermudas", "Las líneas de Nazca", "El caso de los 9 excursionistas Dyatlov" |
-| `ia_tecnologia` | IA y Tecnología | masculino | openai | "Cómo funciona ChatGPT en 60 segundos", "La IA que detecta cáncer mejor que un médico", "Qué es la computación cuántica" |
-| `historia` | Historia | masculino | google | "La batalla de Termópilas", "Por qué cayó el Imperio Romano", "El día que se robó la Mona Lisa" |
-| `guerra` | Guerra | masculino | google | "La batalla de Stalingrado", "D-Day: el desembarco de Normandía", "La guerra de los 100 años en 90 segundos" |
-| `salud_ejercicio` | Salud y Ejercicio | femenino | google | "Por qué no deberías hacer cardio en ayunas", "El ejercicio más efectivo para quemar grasa", "Cuántas repeticiones necesitas realmente" |
-| `salud_alimentacion` | Alimentación y Recetas | femenino | google | "Los beneficios del aguacate que nadie te cuenta", "Receta de bowl de proteína en 5 minutos", "Por qué el aceite de oliva es el mejor para cocinar" |
+| `motivacion` | Motivación | femenino | google | "La disciplina supera al talento", "Empieza aunque no estés listo" |
+| `curiosidades` | Curiosidades | masculino | google | "Por qué bostezamos cuando vemos bostezar a alguien", "La bacteria que sobrevivió en el espacio" |
+| `filosofia` | Filosofía | masculino | google | "No puedes bañarte dos veces en el mismo río (Heráclito)", "Solo sé que no sé nada (Sócrates)" |
+| `misterio` | Misterio | masculino | google | "El triángulo de las Bermudas", "El caso de los 9 excursionistas Dyatlov" |
+| `ia_tecnologia` | IA y Tecnología | masculino | openai | "Cómo funciona ChatGPT en 60 segundos", "Qué es la computación cuántica" |
+| `historia` | Historia | masculino | google | "La batalla de Termópilas", "El día que se robó la Mona Lisa" |
+| `guerra` | Guerra | masculino | google | "La batalla de Stalingrado", "D-Day: el desembarco de Normandía" |
+| `salud_ejercicio` | Salud y Ejercicio | femenino | google | "Por qué no deberías hacer cardio en ayunas", "El ejercicio más efectivo para quemar grasa" |
+| `salud_alimentacion` | Alimentación y Recetas | femenino | google | "Los beneficios del aguacate que nadie te cuenta", "Receta de bowl de proteína en 5 minutos" |
 
 ### Estructura de un nicho
 
@@ -203,6 +203,50 @@ Los prompts usan placeholders `{{tema}}`, `{{tono}}`, `{{idioma}}`, etc. que se 
 
 ---
 
+## Modelos de imagen disponibles
+
+DALL-E 2 y DALL-E 3 fueron deprecados por OpenAI (sunset: 12 mayo 2026). El sistema usa los modelos actuales:
+
+### OpenAI
+
+| Modelo | Resolución portrait | Calidad | Precio/imagen |
+|---|---|---|---|
+| `gpt-image-1` | 1024×1536 | low | $0.016 |
+| `gpt-image-1` | 1024×1536 | medium | $0.063 |
+| `gpt-image-1` | 1024×1536 | high | $0.250 |
+| `gpt-image-1-mini` | 1024×1536 | low | $0.005 |
+| `gpt-image-1-mini` | 1024×1536 | medium | $0.020 |
+| `gpt-image-1-mini` | 1024×1536 | high | $0.060 |
+
+**Default del sistema:** `gpt-image-1` calidad `medium` → ~$0.19 por video con 3 imágenes.  
+**Opción económica:** `gpt-image-1-mini` calidad `medium` → ~$0.06 por video (68% más barato).
+
+### Google (Vertex AI)
+
+| Modelo | Resolución | Notas |
+|---|---|---|
+| `imagen-3.0-generate-002` | 9:16 nativo | Imagen 3, disponible con cuenta de Google Cloud |
+| `imagen-4.0-generate-preview-05-20` | 9:16 nativo | Imagen 4 preview |
+
+---
+
+## Imagen de referencia
+
+Los modelos OpenAI (`gpt-image-1` y `gpt-image-1-mini`) aceptan una **imagen de referencia opcional** para mantener consistencia visual entre todas las imágenes generadas.
+
+**Cómo funciona:**
+1. Subir la imagen de referencia desde el formulario (PNG, JPG o WebP, máx. 50 MB)
+2. Se sube inmediatamente al servidor vía `POST /util/subir-referencia`
+3. Al generar, el backend usa el endpoint `/v1/images/edits` de OpenAI con la referencia aplicada a cada imagen
+
+**Disponible en:**
+- Pipeline completo de video
+- Utilidad de imágenes directas
+
+> No compatible con Google Imagen — se ignora automáticamente si se selecciona esa API.
+
+---
+
 ## Funcionalidades
 
 ### 1. Pipeline completo — Video Short
@@ -214,11 +258,12 @@ Genera un Short completo end-to-end a partir de un tema y nicho.
 ```
 Nicho + Tema
  └─ Guion (GPT-4o, 2 pasos: borrador + mejora con prompts del nicho)
-     ├─ Caption (GPT-4o-mini, prompt del nicho)   ─┐
-     ├─ Audio (Google TTS Neural2)                  ├─ en paralelo
-     └─ Imágenes (DALL-E 3 / Imagen 3)            ─┘
-         └─ Video (FFmpeg, 1080x1920, xfade)
-             └─ Telegram (caption + video)
+     ├─ Caption (GPT-4o-mini, prompt del nicho)    ─┐
+     ├─ Audio (Google TTS Neural2 / OpenAI TTS)     ├─ en paralelo
+     └─ Imágenes (gpt-image-1 / Imagen 3)          ─┘
+         └─ Storyboard narrativo (GPT-4o-mini)
+             └─ Video (FFmpeg, 1080x1920, xfade)
+                 └─ Telegram (caption + video)
 ```
 
 **Opciones disponibles en el formulario:**
@@ -226,33 +271,22 @@ Nicho + Tema
 | Opción | Valores | Default |
 |---|---|---|
 | Nicho | ver tabla de nichos | `motivacion` |
-| Cantidad de imágenes | 1 – 6 | 1 |
+| Cantidad de imágenes | 1 – 8 | 1 |
 | Voz del audio | `masculino` / `femenino` | según nicho |
+| Proveedor TTS | `google` / `openai` | según nicho |
 | API de imágenes | `openai` / `google` | `openai` |
-| Modelo de imágenes | ver tabla abajo | `dall-e-3` |
+| Modelo de imágenes | ver tabla de modelos | `gpt-image-1` |
+| Estilo visual | cinemático, caricatura, b&n, acuarela, minimalista, cyberpunk | `cinematico` |
+| Escenario | ciudad, bosque, lago, montaña, interior, abstracto | sin preferencia |
+| Imagen de referencia | PNG/JPG/WebP opcional | ninguna |
 
-**Modelos de imágenes disponibles:**
-
-| API | Modelo | Resolución |
-|---|---|---|
-| `openai` | `dall-e-3` | 1024×1792 (9:16) |
-| `openai` | `dall-e-2` | 1024×1024 (cuadrado) |
-| `google` | `imagen-3.0-generate-002` | 9:16 nativo |
-
-**Voces de audio:**
-
-| Opción | Voz Google TTS |
-|---|---|
-| `masculino` | es-US-Neural2-B |
-| `femenino` | es-US-Neural2-A |
-
-**Progreso en tiempo real:** el frontend recibe eventos SSE paso a paso (guion listo, caption listo, audio listo, cada imagen lista, video listo, Telegram enviado).
+**Progreso en tiempo real:** el frontend recibe eventos SSE paso a paso (guion listo, caption listo, audio listo, storyboard listo, cada imagen lista, video listo, Telegram enviado).
 
 ---
 
 ### 2. Utilidad — Solo guion + caption → Telegram
 
-Genera el guion (2 pasos con GPT-4o) y el caption, y los envía como texto a Telegram. No genera audio, imágenes ni video. Usa el nicho `motivacion` por defecto.
+Genera el guion (2 pasos con GPT-4o) y el caption, y los envía como texto a Telegram.
 
 **Endpoint:** `POST /util/guion`
 ```json
@@ -263,9 +297,7 @@ Genera el guion (2 pasos con GPT-4o) y el caption, y los envía como texto a Tel
 
 ### 3. Utilidad — Solo imágenes → Telegram
 
-Genera un guion base y a partir de él crea N imágenes con DALL-E 3, enviando cada imagen a Telegram en cuanto está lista.
-
-Los prompts se generan todos de una vez (en bloque) y luego las imágenes se producen secuencialmente.
+Genera un guion base y a partir de él crea N imágenes con el modelo configurado, enviando cada imagen a Telegram en cuanto está lista.
 
 **Endpoint:** `POST /util/imagenes`
 ```json
@@ -276,21 +308,37 @@ Los prompts se generan todos de una vez (en bloque) y luego las imágenes se pro
 
 ### 4. Utilidad — Imágenes con prompt directo → Telegram
 
-Genera N imágenes usando un prompt visual escrito directamente (sin pasar por GPT). Soporta Google Imagen 3 o DALL-E.
+Genera N imágenes usando un prompt visual escrito directamente (sin pasar por GPT). Soporta Google Imagen 3 u OpenAI. Acepta imagen de referencia opcional.
 
 **Endpoint:** `POST /util/imagenes-directas`
 ```json
 {
   "prompt": "Create an image of a lone runner at dawn crossing a finish line",
   "cantidad": 3,
-  "api": "google",
-  "modelo": "imagen-3.0-generate-002"
+  "api": "openai",
+  "modelo": "gpt-image-1",
+  "refImagePath": "/ruta/local/referencia.png"
 }
 ```
 
 ---
 
-### 5. Utilidad — Solo audio → Telegram
+### 5. Utilidad — Subir imagen de referencia
+
+Sube una imagen al servidor para usarla como referencia en generaciones posteriores.
+
+**Endpoint:** `POST /util/subir-referencia` (multipart/form-data)
+
+Campo: `imagen` — archivo PNG, JPG o WebP (máx. 50 MB)
+
+**Respuesta:**
+```json
+{ "refPath": "C:\\...\\output\\referencias\\ref-<uuid>.png", "nombre": "foto.png" }
+```
+
+---
+
+### 6. Utilidad — Solo audio → Telegram
 
 Genera el guion, lo convierte a MP3 con Google TTS y envía el guion (texto) + el audio (archivo) a Telegram.
 
@@ -301,15 +349,15 @@ Genera el guion, lo convierte a MP3 con Google TTS y envía el guion (texto) + e
 
 ---
 
-### 6. Listar nichos
+### 7. Listar nichos
 
-Devuelve los nichos disponibles con sus defaults. Lo usa el frontend para rellenar el selector dinámicamente.
+Devuelve los nichos disponibles con sus defaults.
 
 **Endpoint:** `GET /nichos`
 
 ---
 
-### 7. Historial
+### 8. Historial
 
 Devuelve las últimas 50 generaciones completas (guion, caption, nicho, parámetros usados, rutas de archivos, fecha).
 
@@ -321,7 +369,7 @@ Los videos del historial pueden reenviarse a Telegram con:
 
 ---
 
-### 8. Galería de imágenes
+### 9. Galería de imágenes
 
 Devuelve todas las imágenes generadas durante la sesión actual del servidor (en memoria).
 
@@ -341,41 +389,26 @@ proyecto/
 ├── PROGRESO.md                Estado de implementación del sistema multi-nicho
 ├── historial.json             Se crea automáticamente
 ├── nichos/
-│   ├── motivacion/            Motivación y crecimiento personal
+│   ├── motivacion/
 │   │   ├── config.json
 │   │   └── prompt-*.txt (×5)
-│   ├── curiosidades/          Datos curiosos y hechos sorprendentes
-│   │   ├── config.json
-│   │   └── prompt-*.txt (×5)
-│   ├── filosofia/             Frases filosóficas con explicación
-│   │   ├── config.json
-│   │   └── prompt-*.txt (×5)
-│   ├── misterio/              Fenómenos inexplicables y conspiraciones
-│   │   ├── config.json
-│   │   └── prompt-*.txt (×5)
-│   ├── ia_tecnologia/         Inteligencia artificial e innovación
-│   │   ├── config.json
-│   │   └── prompt-*.txt (×5)
-│   ├── historia/              Eventos históricos y personajes clave
-│   │   ├── config.json
-│   │   └── prompt-*.txt (×5)
-│   ├── guerra/                Batallas y momentos decisivos bélicos
-│   │   ├── config.json
-│   │   └── prompt-*.txt (×5)
-│   ├── salud_ejercicio/       Fitness, entrenamiento y bienestar físico
-│   │   ├── config.json
-│   │   └── prompt-*.txt (×5)
-│   └── salud_alimentacion/    Nutrición, recetas y hábitos alimenticios
-│       ├── config.json
-│       └── prompt-*.txt (×5)
+│   ├── curiosidades/
+│   ├── filosofia/
+│   ├── misterio/
+│   ├── ia_tecnologia/
+│   ├── historia/
+│   ├── guerra/
+│   ├── salud_ejercicio/
+│   └── salud_alimentacion/
 ├── services/
 │   ├── nichos.js              Loader de nichos: listarNichos(), cargarNicho()
 │   ├── guion.js               Genera el guion con GPT-4o (2 pasos, prompts por nicho)
 │   ├── caption.js             Genera el caption con GPT-4o-mini (prompt por nicho)
-│   ├── audio.js               Sintetiza audio MP3 con Google TTS Neural2
-│   ├── imagenes.js            Genera imágenes con DALL-E o Google Imagen 3
+│   ├── audio.js               Sintetiza audio MP3 con Google TTS Neural2 u OpenAI TTS
+│   ├── imagenes.js            Genera imágenes con gpt-image-1, gpt-image-1-mini o Google Imagen 3
+│   │                          Soporta imagen de referencia via /v1/images/edits
 │   ├── storyboard.js          Genera el storyboard visual por nicho
-│   ├── subtitulos.js          Generación de subtítulos
+│   ├── subtitulos.js          Generación de subtítulos con Whisper
 │   ├── video.js               Renderiza el video vertical con FFmpeg
 │   └── telegram.js            Envía video, audio, fotos y texto a Telegram
 ├── utils/
@@ -393,7 +426,9 @@ proyecto/
     ├── guiones/
     ├── audios/
     ├── imagenes/
-    └── videos/
+    ├── videos/
+    ├── subtitulos/
+    └── referencias/           Imágenes de referencia subidas por el usuario
 ```
 
 ---
@@ -407,3 +442,4 @@ proyecto/
 - El historial guarda las últimas **50 generaciones** en `historial.json`, incluyendo el nicho y parámetros usados.
 - El progreso de cada operación se transmite al frontend mediante **Server-Sent Events (SSE)**.
 - Si no se especifica `nicho` en el request, se usa `motivacion` por defecto (compatibilidad hacia atrás).
+- **Imagen de referencia:** cuando se provee `refImagePath`, el backend usa `/v1/images/edits` (OpenAI) en lugar de `/v1/images/generations`, aplicando la misma referencia a todas las imágenes del video. Solo compatible con modelos OpenAI.

@@ -7,14 +7,15 @@ const DIR_GUIONES    = path.join(BASE, 'guiones');
 const DIR_AUDIOS     = path.join(BASE, 'audios');
 const DIR_IMAGENES   = path.join(BASE, 'imagenes');
 const DIR_VIDEOS     = path.join(BASE, 'videos');
-const DIR_SUBTITULOS = path.join(BASE, 'subtitulos');
+const DIR_SUBTITULOS  = path.join(BASE, 'subtitulos');
+const DIR_REFERENCIAS = path.join(BASE, 'referencias');
 
 /**
  * Crea todas las carpetas de output si no existen.
  * Se llama al iniciar el servidor.
  */
 function crearCarpetas() {
-  [DIR_GUIONES, DIR_AUDIOS, DIR_IMAGENES, DIR_VIDEOS, DIR_SUBTITULOS].forEach(dir => {
+  [DIR_GUIONES, DIR_AUDIOS, DIR_IMAGENES, DIR_VIDEOS, DIR_SUBTITULOS, DIR_REFERENCIAS].forEach(dir => {
     fs.mkdirSync(dir, { recursive: true });
   });
   console.log('[archivos] Carpetas de output verificadas.');
@@ -45,4 +46,9 @@ function rutaSubtitulo(id) {
   return path.join(DIR_SUBTITULOS, `subtitulo-${id}.srt`);
 }
 
-module.exports = { crearCarpetas, rutaGuion, rutaAudio, rutaImagen, rutaVideo, rutaSubtitulo };
+/** Retorna la ruta absoluta de una imagen de referencia para un ID dado */
+function rutaReferencia(id, ext = 'png') {
+  return path.join(DIR_REFERENCIAS, `ref-${id}.${ext}`);
+}
+
+module.exports = { crearCarpetas, rutaGuion, rutaAudio, rutaImagen, rutaVideo, rutaSubtitulo, rutaReferencia, DIR_REFERENCIAS };

@@ -47,7 +47,19 @@ function listarNichos() {
  * @returns {object} Objeto nicho con config y prompts listos para usar
  */
 function cargarNicho(id) {
+  // Validar formato: solo letras, números, guiones y guiones bajos.
+  // Bloquea path traversal como "../../../etc/passwd" antes de tocar el FS.
+  if (!id || typeof id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new Error(`Nicho "${id}" inválido.`);
+  }
+
   const rutaNicho = path.join(RUTA_NICHOS, id);
+
+  // Segunda capa: el path resuelto debe estar dentro de RUTA_NICHOS.
+  // Evita bypasses con unicode o combinaciones de separadores.
+  if (!path.resolve(rutaNicho).startsWith(path.resolve(RUTA_NICHOS) + path.sep)) {
+    throw new Error(`Nicho "${id}" inválido.`);
+  }
 
   if (!fs.existsSync(rutaNicho)) {
     throw new Error(`Nicho "${id}" no encontrado. Nichos disponibles: ${listarNichos().map(n => n.id).join(', ')}`);

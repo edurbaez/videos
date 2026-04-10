@@ -542,6 +542,30 @@
     .detail-panel.open { display: block; }
 
     .hidden { display: none !important; }
+
+    /* Imagen de referencia */
+    .ref-upload-box {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      transition: border-color .2s;
+      margin-top: 14px;
+    }
+    .ref-upload-box:hover { border-color: var(--accent); }
+    .ref-upload-box input[type=file] { display: none; }
+    .ref-upload-box .ref-icon { font-size: 1.6rem; flex-shrink: 0; }
+    .ref-upload-box .ref-text { font-size: 0.85rem; color: var(--muted); }
+    .ref-upload-box .ref-text strong { color: var(--text); display: block; font-size: 0.9rem; margin-bottom:2px; }
+    .ref-preview-wrap { display:flex; align-items:center; gap:12px; margin-top:10px; }
+    .ref-preview-wrap img { width:72px; height:72px; object-fit:cover; border-radius:8px; border:1px solid var(--border); }
+    .ref-preview-wrap .ref-nombre { font-size:0.82rem; color:var(--muted); }
+    .ref-preview-wrap .ref-quitar { font-size:0.78rem; color:#e55; cursor:pointer; text-decoration:underline; margin-left:6px; }
+    .ref-badge { display:inline-block; font-size:0.72rem; background:#1a472a; color:#6fcf97; border-radius:4px; padding:2px 7px; margin-left:6px; vertical-align:middle; }
+    .ref-only-openai { font-size:0.78rem; color:var(--muted); margin-top:6px; font-style:italic; }
   </style>
 </head>
 <body>
@@ -656,12 +680,29 @@
         </button>
         <button class="sel-btn" id="i_btnOpenAI" onclick="iSelectApi('openai')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.82a5.98 5.98 0 0 0-.52-4.91 6.05 6.05 0 0 0-6.51-2.9A6.07 6.07 0 0 0 4.98 4.18a5.98 5.98 0 0 0-3.99 2.9 6.05 6.05 0 0 0 .74 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.51 2.9A5.98 5.98 0 0 0 13.26 24a6.06 6.06 0 0 0 5.77-4.21 5.99 5.99 0 0 0 3.99-2.9 6.06 6.06 0 0 0-.74-7.07zm-9.02 12.61a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.79.79 0 0 0 .39-.68V11.7l2.02 1.17a.07.07 0 0 1 .04.05v5.58a4.5 4.5 0 0 1-4.49 4.93zm-9.66-4.13a4.47 4.47 0 0 1-.53-3.01l.14.09 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 19.95a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9A4.49 4.49 0 0 1 4.71 5.92V11.6a.77.77 0 0 0 .39.68l5.81 3.35-2.02 1.17a.08.08 0 0 1-.07 0L3.62 14.04A4.5 4.5 0 0 1 2.34 7.9zm16.6 3.86-5.84-3.37 2.02-1.17a.08.08 0 0 1 .07 0l4.83 2.79a4.49 4.49 0 0 1-.68 8.1V12.44a.79.79 0 0 0-.4-.68zm2.01-3.02-.14-.09-4.77-2.78a.78.78 0 0 0-.79 0L9.41 9.23V6.9a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.31 12.86l-2.02-1.16a.08.08 0 0 1-.04-.06V6.07a4.5 4.5 0 0 1 7.38-3.45l-.14.08-4.78 2.76a.79.79 0 0 0-.39.68l-.01 6.72zm1.1-2.37 2.6-1.5 2.61 1.5v2.99l-2.6 1.5-2.61-1.5V10.5z"/></svg>
-          OpenAI DALL-E
+          OpenAI gpt-image-1
         </button>
       </div>
 
       <label for="i_prompt">Prompt de la imagen</label>
       <textarea id="i_prompt" rows="5" placeholder="Ej: A dramatic cinematic portrait of a determined athlete at sunrise, ultra-realistic, 9:16 vertical format..."></textarea>
+
+      <!-- Imagen de referencia -->
+      <div class="ref-upload-box" id="i_refBox" onclick="document.getElementById('i_refInput').click()">
+        <input type="file" id="i_refInput" accept="image/png,image/jpeg,image/webp" onchange="iSubirReferencia(this)">
+        <span class="ref-icon">🖼️</span>
+        <div class="ref-text">
+          <strong>Imagen de referencia <span class="ref-badge">opcional</span></strong>
+          Sube una foto para mantener consistencia visual entre imágenes · Solo OpenAI
+        </div>
+      </div>
+      <div class="ref-preview-wrap hidden" id="i_refPreview">
+        <img id="i_refPreviewImg" src="" alt="referencia">
+        <div>
+          <div class="ref-nombre" id="i_refNombre"></div>
+          <span class="ref-quitar" onclick="iQuitarReferencia()">✕ Quitar referencia</span>
+        </div>
+      </div>
 
       <div class="form-row" style="margin-top:16px">
         <div class="field">
@@ -679,8 +720,8 @@
           <select id="i_modelo">
             <option value="imagen-3.0-generate-002" data-api="google">Imagen 3</option>
             <option value="imagen-4.0-generate-preview-05-20" data-api="google">Imagen 4 (preview)</option>
-            <option value="dall-e-3" data-api="openai">DALL-E 3</option>
-            <option value="dall-e-2" data-api="openai">DALL-E 2</option>
+            <option value="gpt-image-1" data-api="openai">gpt-image-1 (calidad alta)</option>
+            <option value="gpt-image-1-mini" data-api="openai">gpt-image-1-mini (económico)</option>
           </select>
         </div>
       </div>
@@ -739,8 +780,8 @@
         <div class="field-sm">
           <label for="v_inputModelo">Modelo de imagen</label>
           <select id="v_inputModelo">
-            <option value="dall-e-3">DALL-E 3</option>
-            <option value="dall-e-2">DALL-E 2</option>
+            <option value="gpt-image-1">gpt-image-1 (calidad alta)</option>
+            <option value="gpt-image-1-mini">gpt-image-1-mini (económico)</option>
             <option value="imagen-3.0-generate-002">Google Imagen 3</option>
           </select>
         </div>
@@ -804,7 +845,24 @@
         </div>
       </div>
 
-      <button class="btn-gen" id="v_btnGenerar">Generar video</button>
+      <!-- Imagen de referencia video -->
+      <div class="ref-upload-box" id="v_refBox" onclick="document.getElementById('v_refInput').click()">
+        <input type="file" id="v_refInput" accept="image/png,image/jpeg,image/webp" onchange="vSubirReferencia(this)">
+        <span class="ref-icon">🖼️</span>
+        <div class="ref-text">
+          <strong>Imagen de referencia <span class="ref-badge">opcional</span></strong>
+          Misma referencia para todas las imágenes del video · Solo OpenAI
+        </div>
+      </div>
+      <div class="ref-preview-wrap hidden" id="v_refPreview">
+        <img id="v_refPreviewImg" src="" alt="referencia">
+        <div>
+          <div class="ref-nombre" id="v_refNombre"></div>
+          <span class="ref-quitar" onclick="vQuitarReferencia()">✕ Quitar referencia</span>
+        </div>
+      </div>
+
+      <button class="btn-gen" id="v_btnGenerar" style="margin-top:18px">Generar video</button>
     </div>
 
     <!-- Progreso video -->
@@ -1033,8 +1091,33 @@ document.getElementById('a_btnGenerar').addEventListener('click', async () => {
 // SECCIÓN IMÁGENES
 // ═══════════════════════════════════════
 
-let iApi = 'google';
-let iES  = null;
+let iApi     = 'google';
+let iES      = null;
+let iRefPath = null;
+
+async function iSubirReferencia(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('imagen', file);
+  try {
+    const r = await fetch('/util/subir-referencia', { method: 'POST', body: fd });
+    const { refPath, error } = await r.json();
+    if (error) throw new Error(error);
+    iRefPath = refPath;
+    document.getElementById('i_refPreviewImg').src = URL.createObjectURL(file);
+    document.getElementById('i_refNombre').textContent = file.name;
+    document.getElementById('i_refPreview').classList.remove('hidden');
+    document.getElementById('i_refBox').style.borderColor = 'var(--accent)';
+  } catch(e) { alert('Error subiendo referencia: ' + e.message); }
+}
+
+function iQuitarReferencia() {
+  iRefPath = null;
+  document.getElementById('i_refInput').value = '';
+  document.getElementById('i_refPreview').classList.add('hidden');
+  document.getElementById('i_refBox').style.borderColor = '';
+}
 
 function iSelectApi(api) {
   iApi = api;
@@ -1079,7 +1162,7 @@ document.getElementById('i_btnGenerar').addEventListener('click', async () => {
     const resp = await fetch('/util/imagenes-directas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, cantidad, modelo, api: iApi }),
+      body: JSON.stringify({ prompt, cantidad, modelo, api: iApi, refImagePath: iRefPath }),
     });
     const { id, error } = await resp.json();
     if (error) throw new Error(error);
@@ -1151,9 +1234,34 @@ document.getElementById('i_btnGenerar').addEventListener('click', async () => {
 // SECCIÓN VIDEO
 // ═══════════════════════════════════════
 
-let vVoz = 'femenino';
-let vTTS = 'google';
+let vVoz      = 'femenino';
+let vTTS      = 'google';
 let vEstilo   = 'cinematico';
+let vRefPath  = null;
+
+async function vSubirReferencia(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('imagen', file);
+  try {
+    const r = await fetch('/util/subir-referencia', { method: 'POST', body: fd });
+    const { refPath, error } = await r.json();
+    if (error) throw new Error(error);
+    vRefPath = refPath;
+    document.getElementById('v_refPreviewImg').src = URL.createObjectURL(file);
+    document.getElementById('v_refNombre').textContent = file.name;
+    document.getElementById('v_refPreview').classList.remove('hidden');
+    document.getElementById('v_refBox').style.borderColor = 'var(--accent)';
+  } catch(e) { alert('Error subiendo referencia: ' + e.message); }
+}
+
+function vQuitarReferencia() {
+  vRefPath = null;
+  document.getElementById('v_refInput').value = '';
+  document.getElementById('v_refPreview').classList.add('hidden');
+  document.getElementById('v_refBox').style.borderColor = '';
+}
 let vEscenario = 'ninguno';
 let vES  = null;
 let vStoryboardActivo = false;
@@ -1236,7 +1344,7 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
   const nicho    = document.getElementById('v_inputNicho').value;
   const cantidad = document.getElementById('v_inputCantidad').value;
   const modelo   = document.getElementById('v_inputModelo').value;
-  const apiMap   = { 'dall-e-3':'openai', 'dall-e-2':'openai', 'imagen-3.0-generate-002':'google' };
+  const apiMap   = { 'gpt-image-1':'openai', 'gpt-image-1-mini':'openai', 'imagen-3.0-generate-002':'google', 'imagen-4.0-generate-preview-05-20':'google' };
   const api      = apiMap[modelo] || 'openai';
 
   if (!tema) { vMostrarError('Escribe el tema del video antes de continuar.'); return; }
@@ -1268,7 +1376,7 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
     const resp = await fetch('/generar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema, nicho, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS, estilo: vEstilo, escenario: vEscenario }),
+      body: JSON.stringify({ tema, nicho, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS, estilo: vEstilo, escenario: vEscenario, refImagePath: vRefPath }),
     });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || 'Error al iniciar.'); }
     const { id } = await resp.json();

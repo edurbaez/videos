@@ -9,7 +9,7 @@
     "estilo": "moderno",
     "escenario": "ninguno",
     "cantidadImagenes": 3,
-    "modeloImagen": "dall-e-3",
+    "modeloImagen": "gpt-image-1",
     "apiImagen": "openai"
   },
   "guion": {

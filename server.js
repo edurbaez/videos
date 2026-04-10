@@ -5,7 +5,9 @@ const cors = require('cors');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-const { crearCarpetas, rutaAudio, rutaVideo, rutaSubtitulo } = require('./utils/archivos');
+const multer = require('multer');
+const { crearCarpetas, rutaAudio, rutaVideo, rutaSubtitulo, DIR_REFERENCIAS } = require('./utils/archivos');
+const seg = require('./middleware/seguridad');
 const { leerHistorial, guardarEntrada } = require('./utils/historial');
 const { listarNichos, cargarNicho } = require('./services/nichos');
 const { generarGuion } = require('./services/guion');
@@ -19,8 +21,33 @@ const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = r
 // ── Inicialización ────────────────────────────────────────────────────────────
 crearCarpetas();
 
+// Multer para subida de imagen de referencia
+const uploadRef = multer({
+  storage: multer.diskStorage({
+    destination: DIR_REFERENCIAS,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.png';
+      cb(null, `ref-${uuidv4()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/image\/(png|jpeg|webp)/.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Solo se aceptan imágenes PNG, JPG o WebP.'));
+  },
+});
+
 const app = express();
-app.use(cors());
+
+// CORS: acepta solo el origen configurado en CORS_ORIGIN (o localhost en dev)
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || `http://localhost:${process.env.PORT || 3000}`,
+}));
+
+// Rate limiting global + autenticación por API Key
+app.use(seg.limitarGlobal);
+app.use(seg.validarApiKey);
+
 app.use(express.json());
 
 // Servir archivos estáticos del frontend y del directorio output
@@ -50,9 +77,25 @@ function emitirEvento(id, evento, datos) {
   }
 }
 
+// ── POST /util/subir-referencia — Subir imagen de referencia ─────────────────
+app.post('/util/subir-referencia', seg.limitarGenerar, uploadRef.single('imagen'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+  // Verificar magic bytes reales (el Content-Type del cliente es manipulable)
+  try {
+    seg.verificarMagicBytes(req.file.path);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+  res.json({ refPath: req.file.path, nombre: req.file.originalname });
+});
+
 // ── GET /progreso/:id — SSE ───────────────────────────────────────────────────
 app.get('/progreso/:id', (req, res) => {
   const { id } = req.params;
+
+  if (sseClients.size >= seg.MAX_SSE_CLIENTES) {
+    return res.status(429).json({ error: 'Demasiadas conexiones activas. Intenta más tarde.' });
+  }
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -73,23 +116,41 @@ app.get('/progreso/:id', (req, res) => {
 });
 
 // ── POST /generar — Pipeline principal ───────────────────────────────────────
-app.post('/generar', async (req, res) => {
+app.post('/generar', seg.limitarGenerar, async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
   const {
-    tema,
-    nicho    = 'motivacion',
-    cantidad = 1,
+    nicho       = 'motivacion',
     genero,
     modelo,
-    api,
-    subtitulos = false,
+    api         = 'openai',
+    subtitulos  = false,
     tts,
     estilo,
     escenario,
+    quality     = 'medium',
   } = req.body;
 
-  if (!tema || !tema.trim()) {
+  // Sanitización de inputs del usuario
+  const tema     = seg.sanitizarTema(req.body.tema);
+  const cantidad = seg.validarCantidad(req.body.cantidad, 20);
+
+  if (!tema) {
     return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
+  }
+
+  // Validar modelo antes de usarlo en URLs de API (anti-SSRF)
+  try {
+    seg.validarModelo(modelo, api);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+
+  // Validar refImagePath: debe estar dentro de output/referencias/
+  let refImagePath = null;
+  try {
+    refImagePath = seg.validarRefImagePath(req.body.refImagePath, DIR_REFERENCIAS);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
   }
 
   // Cargar config del nicho — falla rápido si el nicho no existe
@@ -102,7 +163,7 @@ app.post('/generar', async (req, res) => {
 
   // Fusionar defaults del nicho con los parámetros enviados por el usuario
   const vozFinal      = genero   || nichoConfig.defaults.voz       || 'femenino';
-  const modeloFinal   = modelo   || nichoConfig.defaults.modeloImagen || 'dall-e-3';
+  const modeloFinal   = modelo   || nichoConfig.defaults.modeloImagen || 'gpt-image-1';
   const apiFinal      = api      || nichoConfig.defaults.apiImagen  || 'openai';
   const ttsFinal      = tts      || nichoConfig.defaults.tts        || 'google';
   const estiloFinal   = estilo   || nichoConfig.defaults.estilo     || 'cinematico';
@@ -158,7 +219,7 @@ app.post('/generar', async (req, res) => {
           emitirEvento(id, 'storyboard_listo', { escenas });
         }, (n, mensaje) => {
           emitirEvento(id, 'error_imagen', { n, mensaje });
-        }, nichoConfig).then(rutas => {
+        }, nichoConfig, refImagePath, quality).then(rutas => {
           const urlsImagenes = rutas.map((_, i) => `/output/imagenes/imagen-${id}-${i + 1}.png`);
           emitirEvento(id, 'imagenes_listas', { rutas: urlsImagenes });
           return rutas;
@@ -243,10 +304,10 @@ app.get('/galeria', (req, res) => {
 });
 
 // ── POST /util/guion — Solo guion → Telegram ──────────────────────────────
-app.post('/util/guion', async (req, res) => {
+app.post('/util/guion', seg.limitarGenerar, async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema } = req.body;
-  if (!tema?.trim()) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
+  const tema = seg.sanitizarTema(req.body.tema);
+  if (!tema) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
   try {
     const nichoConfig = cargarNicho('motivacion');
@@ -266,6 +327,11 @@ app.post('/util/guion', async (req, res) => {
 // ── GET /util/imagenes-progress/:id — SSE para imágenes ──────────────────
 app.get('/util/imagenes-progress/:id', (req, res) => {
   const { id } = req.params;
+
+  if (sseImgClients.size >= seg.MAX_SSE_CLIENTES) {
+    return res.status(429).json({ error: 'Demasiadas conexiones activas. Intenta más tarde.' });
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -276,10 +342,11 @@ app.get('/util/imagenes-progress/:id', (req, res) => {
 });
 
 // ── POST /util/imagenes — Solo imágenes → Telegram (secuencial + SSE) ────
-app.post('/util/imagenes', async (req, res) => {
+app.post('/util/imagenes', seg.limitarGenerar, async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema, cantidad = 2 } = req.body;
-  if (!tema?.trim()) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
+  const tema     = seg.sanitizarTema(req.body.tema);
+  const cantidad = seg.validarCantidad(req.body.cantidad ?? 2);
+  if (!tema) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
   const id = 'util-' + uuidv4();
   res.json({ id });
@@ -292,7 +359,7 @@ app.post('/util/imagenes', async (req, res) => {
 
     try {
       const nichoConfig = cargarNicho('motivacion');
-      const cantNum = parseInt(cantidad);
+      const cantNum = cantidad; // ya validado con validarCantidad()
       console.log(`[${ts()}] Util/imagenes: tema="${tema}" cantidad=${cantNum}`);
 
       emit('progreso', { mensaje: 'Generando guion base...' });
@@ -326,6 +393,11 @@ app.post('/util/imagenes', async (req, res) => {
 // ── GET /util/audio-progress/:id — SSE para audio ────────────────────────────
 app.get('/util/audio-progress/:id', (req, res) => {
   const { id } = req.params;
+
+  if (sseAudioClients.size >= seg.MAX_SSE_CLIENTES) {
+    return res.status(429).json({ error: 'Demasiadas conexiones activas. Intenta más tarde.' });
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -336,10 +408,11 @@ app.get('/util/audio-progress/:id', (req, res) => {
 });
 
 // ── POST /util/audio — Tema → Guion → Audio Google TTS → Telegram ─────────────
-app.post('/util/audio', async (req, res) => {
+app.post('/util/audio', seg.limitarGenerar, async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { tema, nicho = 'motivacion', genero, tts, idioma, voz } = req.body;
-  if (!tema?.trim()) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
+  const { nicho = 'motivacion', genero, tts, idioma, voz } = req.body;
+  const tema = seg.sanitizarTema(req.body.tema);
+  if (!tema) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
   const id = 'audio-' + uuidv4();
   res.json({ id });
@@ -386,10 +459,28 @@ app.post('/util/audio', async (req, res) => {
 });
 
 // ── POST /util/imagenes-directas — Prompt directo → imágenes (Google o OpenAI) + Telegram ──
-app.post('/util/imagenes-directas', async (req, res) => {
+app.post('/util/imagenes-directas', seg.limitarGenerar, async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { prompt, cantidad = 2, modelo, api = 'google' } = req.body;
-  if (!prompt?.trim()) return res.status(400).json({ error: 'El campo "prompt" es obligatorio.' });
+  const { modelo, api = 'google', quality = 'medium' } = req.body;
+  const prompt   = seg.sanitizarTema(req.body.prompt);
+  const cantidad = seg.validarCantidad(req.body.cantidad ?? 2);
+
+  if (!prompt) return res.status(400).json({ error: 'El campo "prompt" es obligatorio.' });
+
+  // Validar modelo (anti-SSRF)
+  try {
+    seg.validarModelo(modelo, api);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+
+  // Validar refImagePath
+  let refImagePath = null;
+  try {
+    refImagePath = seg.validarRefImagePath(req.body.refImagePath, DIR_REFERENCIAS);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
 
   const id = 'util-' + uuidv4();
   res.json({ id });
@@ -401,9 +492,9 @@ app.post('/util/imagenes-directas', async (req, res) => {
     };
 
     try {
-      const cantNum = parseInt(cantidad);
-      const modeloFinal = modelo || (api === 'google' ? 'imagen-3.0-generate-002' : 'dall-e-3');
-      const apiNombre = api === 'google' ? 'Google Imagen' : 'OpenAI DALL-E';
+      const cantNum = cantidad; // ya validado con validarCantidad()
+      const modeloFinal = modelo || (api === 'google' ? 'imagen-3.0-generate-002' : 'gpt-image-1');
+      const apiNombre = api === 'google' ? 'Google Imagen' : 'OpenAI gpt-image-1';
       console.log(`[${ts()}] Util/imagenes-directas: api=${api} modelo=${modeloFinal} cantidad=${cantNum}`);
 
       emit('progreso', { mensaje: `Generando ${cantNum} imagen${cantNum !== 1 ? 'es' : ''} con ${apiNombre}...` });
@@ -419,7 +510,7 @@ app.post('/util/imagenes-directas', async (req, res) => {
           console.error(`[util/imagenes-directas] Error Telegram imagen ${n}:`, err.message);
           emit('telegram_error', { n, mensaje: err.message });
         }
-      });
+      }, refImagePath, quality);
 
       emit('finalizado', { total: cantNum });
     } catch (err) {
@@ -455,9 +546,11 @@ app.post('/reenviar/:id', async (req, res) => {
 });
 
 // ── Middleware de errores global ──────────────────────────────────────────────
+// En producción (NODE_ENV=production) se devuelve un mensaje genérico para
+// evitar filtrar rutas internas, tokens o stack traces al cliente.
 app.use((err, req, res, _next) => {
   console.error('[ERROR GLOBAL]', err.message);
-  res.status(500).json({ error: err.message });
+  res.status(err.status || 500).json({ error: seg.mensajeError(err) });
 });
 
 // ── Arranque ───────────────────────────────────────────────────────────────────
