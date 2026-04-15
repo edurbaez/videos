@@ -109,6 +109,23 @@ El objeto `nichoConfig` que viaja por todo el pipeline tiene esta forma:
 
 ---
 
+## Revisión de seguridad post-implementación
+
+Después de implementar cualquier característica o modificación, **revisar automáticamente el código introducido** en busca de vulnerabilidades comunes (OWASP Top 10, inyección de comandos, exposición de secretos, validación de entrada, etc.) y devolver un informe corto con el siguiente formato:
+
+```
+### Revisión de seguridad
+- **Vulnerabilidades encontradas**: [lista o "ninguna"]
+- **Riesgo**: [Alto / Medio / Bajo / Ninguno]
+- **Soluciones propuestas**:
+  1. ...
+  2. ...
+```
+
+Si no se detectan vulnerabilidades, indicarlo brevemente. El informe debe ser conciso (máx. 10 líneas).
+
+---
+
 ## Convenciones del proyecto
 
 - **Compatibilidad hacia atrás**: si no llega `nicho` en el request, usar `'motivacion'` por defecto.

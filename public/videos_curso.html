@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Videos de Curso</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0f;
+      --surface: #18181c;
+      --surface2:#222228;
+      --border:  #2e2e38;
+      --accent:  #6366f1;
+      --accent2: #818cf8;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --warn:    #f59e0b;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    .container { max-width: 720px; margin: 0 auto; }
+
+    /* ── Navegación ─────────────────────────────────────────────────────── */
+    .nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      padding: 5px 13px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      transition: color .2s, border-color .2s;
+    }
+    .nav a:hover { color: var(--text); border-color: var(--accent); }
+    .nav a.active { color: var(--accent2); border-color: var(--accent2); }
+
+    /* ── Cabecera ───────────────────────────────────────────────────────── */
+    h1 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+
+    /* ── Cards ──────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Form ───────────────────────────────────────────────────────────── */
+    label {
+      display: block;
+      font-size: 0.83rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field { margin-bottom: 16px; }
+
+    textarea, select, input[type="text"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 11px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      transition: border-color .2s;
+    }
+    textarea:focus, select:focus, input:focus { border-color: var(--accent); }
+
+    select {
+      resize: none;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+    select option { background: var(--surface2); }
+
+    /* ── Selector de voz ────────────────────────────────────────────────── */
+    .voice-row { display: flex; gap: 10px; }
+    .voice-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .voice-btn:hover { border-color: var(--accent); color: var(--text); }
+    .voice-btn.sel-fem { border-color: #ec4899; background: #ec489918; color: #f9a8d4; }
+    .voice-btn.sel-mas { border-color: #3b82f6; background: #3b82f618; color: #93c5fd; }
+
+    /* ── Botón principal ────────────────────────────────────────────────── */
+    .btn-gen {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      margin-top: 4px;
+    }
+    .btn-gen:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
+    .btn-gen:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    /* ── Progreso ───────────────────────────────────────────────────────── */
+    #progreso-box { display: none; }
+
+    .log-wrap {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 0.83rem;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+    }
+    .log-line { padding: 2px 0; color: var(--muted); }
+    .log-line.ok  { color: var(--success); }
+    .log-line.err { color: var(--error); }
+    .log-line.hi  { color: var(--accent2); }
+
+    /* ── Estado inline ──────────────────────────────────────────────────── */
+    #estado-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+    }
+    .badge-generando { background: #6366f122; border: 1px solid var(--accent); color: var(--accent2); }
+    .badge-ok        { background: #22c55e22; border: 1px solid var(--success); color: #86efac; }
+    .badge-error     { background: #ef444422; border: 1px solid var(--error);   color: #fca5a5; }
+
+    .spinner {
+      width: 12px; height: 12px;
+      border: 2px solid var(--accent);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Lista de archivos ──────────────────────────────────────────────── */
+    #lista-vacia {
+      text-align: center;
+      color: var(--muted);
+      padding: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .archivo-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: var(--surface2);
+      transition: border-color .2s;
+    }
+    .archivo-item:hover { border-color: var(--accent); }
+
+    .archivo-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .num-badge {
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .archivo-nombre {
+      font-weight: 600;
+      font-size: 0.95rem;
+      flex: 1;
+    }
+    .archivo-links {
+      display: flex;
+      gap: 8px;
+    }
+    .archivo-links a {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 3px 9px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: color .2s, border-color .2s;
+    }
+    .archivo-links a:hover { color: var(--accent2); border-color: var(--accent2); }
+
+    audio {
+      width: 100%;
+      height: 36px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      accent-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .texto-toggle {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 8px;
+      transition: color .2s;
+    }
+    .texto-toggle:hover { color: var(--text); }
+    .texto-toggle .arrow { transition: transform .2s; }
+    .texto-toggle.open .arrow { transform: rotate(90deg); }
+
+    .texto-contenido {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.875rem;
+      line-height: 1.65;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .texto-contenido.visible { display: block; }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: color .2s, border-color .2s;
+    }
+    .copy-btn:hover { color: var(--accent2); border-color: var(--accent2); }
+    .copy-btn.copied { color: var(--success); border-color: var(--success); }
+
+    /* ── Panel de opciones de imagen ────────────────────────────────────── */
+    .img-options {
+      display: none;
+      background: #1e1e2a;
+      border: 1px solid #4f46e5;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 10px;
+      margin-bottom: 0;
+    }
+    .img-options.visible { display: block; }
+    .img-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* ── Editor de prompt ───────────────────────────────────────────────── */
+    .prompt-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      padding: 8px 14px;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 0;
+      transition: color .2s, border-color .2s;
+    }
+    .prompt-toggle:hover { color: var(--text); border-color: var(--accent); }
+    .prompt-toggle .pt-arrow { transition: transform .2s; margin-left: auto; }
+    .prompt-toggle.open { border-color: var(--accent); color: var(--accent2); margin-bottom: 10px; }
+    .prompt-toggle.open .pt-arrow { transform: rotate(90deg); }
+
+    .prompt-editor { display: none; }
+    .prompt-editor.visible { display: block; }
+
+    .prompt-editor textarea {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      min-height: 180px;
+      color: #c4b5fd;
+      border-color: #4f46e5;
+    }
+    .prompt-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .prompt-hint code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 0.75rem;
+      color: #a78bfa;
+    }
+    .btn-reset-prompt {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: color .2s, border-color .2s;
+    }
+    .btn-reset-prompt:hover { color: var(--warn); border-color: var(--warn); }
+
+    /* ── Separador de sección ───────────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+    }
+    .refresh-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color .2s, border-color .2s;
+    }
+    .refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Navegación -->
+  <nav class="nav">
+    <a href="/">Inicio</a>
+    <a href="/audio.html">Audio</a>
+    <a href="/audios-de-aleman.html">Audios DE</a>
+    <a href="/guion.html">Guion</a>
+    <a href="/imagenes.html">Imágenes</a>
+    <a href="/creacion_de_contenido.html">Contenido</a>
+    <a href="/videos_curso.html" class="active">Videos Curso</a>
+  </nav>
+
+  <h1>Videos de Curso</h1>
+  <p class="subtitle">Genera guion + audio para lecciones de curso en múltiples idiomas</p>
+
+  <!-- ── Formulario ─────────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Nueva lección</div>
+
+    <div class="field">
+      <label for="tema">Tema de la lección</label>
+      <textarea id="tema" rows="3" placeholder="Ej: Die Verwendung des Dativs im Deutschen, How to use React hooks, Las fases del sueño..."></textarea>
+    </div>
+
+    <div class="field">
+      <label for="idioma">Idioma del guion y el audio</label>
+      <select id="idioma">
+        <option value="de" selected>🇩🇪 Deutsch</option>
+        <option value="en">🇺🇸 English</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="pt">🇧🇷 Português</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="nivel">Nivel del lenguaje</label>
+      <select id="nivel">
+        <option value="A1">A1 — Principiante</option>
+        <option value="A2">A2 — Elemental</option>
+        <option value="B1" selected>B1 — Intermedio</option>
+        <option value="B2">B2 — Intermedio alto</option>
+        <option value="C1">C1 — Avanzado</option>
+        <option value="C2">C2 — Dominio</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="palabras">Palabras o frases que debe incluir el texto <span style="color:var(--muted);font-weight:400;">(opcional)</span></label>
+      <textarea id="palabras" rows="2" placeholder="Ej: Konjunktiv II, hätte, würde, obwohl — separadas por coma o espacio"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Tipo de salida</label>
+      <div class="voice-row">
+        <button class="voice-btn sel-mas" id="btn-modo-audio" onclick="seleccionarModo('audio')">
+          🎵 Solo audio
+        </button>
+        <button class="voice-btn" id="btn-modo-video" onclick="seleccionarModo('video')">
+          🎬 Audio + Video
+        </button>
+      </div>
+      <!-- Panel de opciones solo visible en modo video -->
+      <div class="img-options" id="img-options">
+        <div class="img-options-grid">
+          <div>
+            <label for="cantidad-imagenes" style="margin-bottom:6px;">Número de imágenes</label>
+            <select id="cantidad-imagenes">
+              <option value="1" selected>1 imagen</option>
+              <option value="2">2 imágenes</option>
+              <option value="3" >3 imágenes</option>
+              <option value="4">4 imágenes</option>
+              <option value="5">5 imágenes</option>
+            </select>
+          </div>
+          <div>
+            <label for="api-imagen" style="margin-bottom:6px;">API de imágenes</label>
+            <select id="api-imagen" onchange="actualizarModeloImagen()">
+              <option value="openai" selected>OpenAI</option>
+              <option value="google">Google Imagen</option>
+            </select>
+          </div>
+          <div id="modelo-imagen-wrap">
+            <label for="modelo-imagen" style="margin-bottom:6px;">Modelo de imagen</label>
+            <select id="modelo-imagen">
+              <option value="gpt-image-1" >gpt-image-1 — Potente</option>
+              <option value="gpt-image-1-mini" selected>gpt-image-1-mini — Económico</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Género de voz (Google Neural2)</label>
+      <div class="voice-row">
+        <button class="voice-btn sel-mas" id="btn-mas" onclick="seleccionarGenero('masculino')">
+          <span>♂</span> Masculino
+        </button>
+        <button class="voice-btn" id="btn-fem" onclick="seleccionarGenero('femenino')">
+          <span>♀</span> Femenino
+        </button>
+      </div>
+    </div>
+
+    <!-- Editor de prompt colapsable -->
+    <div class="field" style="margin-bottom:16px;">
+      <button class="prompt-toggle" id="prompt-toggle" onclick="togglePrompt()">
+        <span>✏️</span> Personalizar prompt de OpenAI
+        <span class="pt-arrow">▶</span>
+      </button>
+      <div class="prompt-editor" id="prompt-editor">
+        <textarea id="prompt-custom" rows="9" spellcheck="false"></textarea>
+        <div class="prompt-hint">
+          <span>Placeholders: <code>{tema}</code> <code>{idioma}</code> <code>{nivel}</code> <code>{palabras}</code> — la línea con <code>{palabras}</code> se omite si está vacío</span>
+          <button class="btn-reset-prompt" onclick="resetPrompt()">↺ Restablecer</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-gen" id="btn-generar" onclick="generarLeccion()">
+      Generar guion + audio
+    </button>
+  </div>
+
+  <!-- ── Progreso ────────────────────────────────────────────────────────── -->
+  <div class="card" id="progreso-box">
+    <div id="estado-badge" class="badge-generando">
+      <div class="spinner"></div>
+      <span id="estado-texto">Iniciando...</span>
+    </div>
+    <div class="log-wrap" id="log-wrap"></div>
+  </div>
+
+  <!-- ── Lista de archivos ───────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="section-header">
+      <span class="section-title">Archivos generados</span>
+      <button class="refresh-btn" onclick="cargarArchivos()">↻ Actualizar</button>
+    </div>
+    <div id="lista-archivos">
+      <div id="lista-vacia">Cargando...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Prompt por defecto (template con placeholders) ───────────────────────
+  const PROMPT_DEFAULT = `You are a professional online course instructor. Write a spoken script for a short educational audio about the topic below.
+
+Rules:
+- The script must be entirely in {idioma}.
+- Language level: {nivel} — adjust vocabulary, sentence complexity, and grammar accordingly.
+- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.
+- Target length: 150–220 words (approximately 1–2 minutes when spoken).
+- Naturally incorporate these words or phrases: {palabras}
+- Write ONLY the spoken text, nothing else.
+
+Topic: {tema}`;
+
+  const LANG_NAMES = {
+    de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
+    fr: 'French (Français)', pt: 'Portuguese (Português)',
+  };
+
+  // Inicializa el textarea con el template al cargar
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('prompt-custom').value = PROMPT_DEFAULT;
+  });
+
+  function togglePrompt() {
+    const btn    = document.getElementById('prompt-toggle');
+    const editor = document.getElementById('prompt-editor');
+    const abierto = editor.classList.toggle('visible');
+    btn.classList.toggle('open', abierto);
+  }
+
+  function resetPrompt() {
+    document.getElementById('prompt-custom').value = PROMPT_DEFAULT;
+  }
+
+  // ── Estado de la UI ──────────────────────────────────────────────────────
+  let generoSeleccionado = 'masculino';
+  let modoSeleccionado   = 'audio';
+
+  function seleccionarModo(m) {
+    modoSeleccionado = m;
+    document.getElementById('btn-modo-audio').className = m === 'audio' ? 'voice-btn sel-mas' : 'voice-btn';
+    document.getElementById('btn-modo-video').className = m === 'video' ? 'voice-btn sel-mas' : 'voice-btn';
+    document.getElementById('img-options').classList.toggle('visible', m === 'video');
+    document.getElementById('btn-generar').textContent = m === 'video'
+      ? 'Generar guion + audio + video'
+      : 'Generar guion + audio';
+  }
+
+  function actualizarModeloImagen() {
+    const api   = document.getElementById('api-imagen').value;
+    const wrap  = document.getElementById('modelo-imagen-wrap');
+    const sel   = document.getElementById('modelo-imagen');
+    if (api === 'google') {
+      wrap.style.display = 'none';
+    } else {
+      wrap.style.display = '';
+      // Restaurar opciones OpenAI si se cambió
+      if (!sel.querySelector('option[value="gpt-image-1"]')) {
+        sel.innerHTML = '<option value="gpt-image-1" selected>gpt-image-1 — Potente</option>'
+                      + '<option value="gpt-image-1-mini">gpt-image-1-mini — Económico</option>';
+      }
+    }
+  }
+
+  function seleccionarGenero(g) {
+    generoSeleccionado = g;
+    document.getElementById('btn-mas').className = g === 'masculino' ? 'voice-btn sel-mas' : 'voice-btn';
+    document.getElementById('btn-fem').className = g === 'femenino'  ? 'voice-btn sel-fem' : 'voice-btn';
+  }
+
+  // ── Log de progreso ──────────────────────────────────────────────────────
+  function logLine(texto, tipo = '') {
+    const wrap = document.getElementById('log-wrap');
+    const div = document.createElement('div');
+    div.className = 'log-line' + (tipo ? ' ' + tipo : '');
+    const now = new Date().toTimeString().slice(0, 8);
+    div.textContent = `[${now}] ${texto}`;
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function setBadge(tipo, texto) {
+    const badge = document.getElementById('estado-badge');
+    const span  = document.getElementById('estado-texto');
+    badge.className = `badge-${tipo}`;
+    span.textContent = texto;
+    if (tipo === 'generando') {
+      badge.insertAdjacentHTML('afterbegin', '<div class="spinner"></div>');
+    } else {
+      const sp = badge.querySelector('.spinner');
+      if (sp) sp.remove();
+    }
+  }
+
+  // ── Generación ───────────────────────────────────────────────────────────
+  // Resuelve los placeholders en el prompt del textarea
+  function resolverPrompt(tema, idioma, nivel, palabras) {
+    const template = document.getElementById('prompt-custom').value.trim();
+    const langName = LANG_NAMES[idioma] || idioma;
+    let result = template
+      .replace(/\{tema\}/g, tema)
+      .replace(/\{idioma\}/g, langName)
+      .replace(/\{nivel\}/g, nivel);
+
+    if (palabras && palabras.trim()) {
+      result = result.replace(/\{palabras\}/g, palabras.trim());
+    } else {
+      // Elimina la línea entera que contenga {palabras} si está vacío
+      result = result.replace(/^.*\{palabras\}.*\n?/gm, '');
+    }
+
+    return result.trim();
+  }
+
+  async function generarLeccion() {
+    const tema    = document.getElementById('tema').value.trim();
+    const idioma  = document.getElementById('idioma').value;
+    const nivel   = document.getElementById('nivel').value;
+    const palabras = document.getElementById('palabras').value.trim();
+    if (!tema) { alert('Escribe el tema de la lección.'); return; }
+
+    // Mostrar panel de progreso
+    const progBox = document.getElementById('progreso-box');
+    progBox.style.display = 'block';
+    document.getElementById('log-wrap').innerHTML = '';
+    setBadge('generando', 'Iniciando pipeline...');
+    document.getElementById('btn-generar').disabled = true;
+
+    let sseRef = null;
+
+    try {
+      // 1. POST /curso/generar → recibir id
+      const resp = await fetch('/curso/generar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tema,
+          idioma,
+          nivel,
+          palabras,
+          genero:            generoSeleccionado,
+          modo:              modoSeleccionado,
+          cantidadImagenes:  document.getElementById('cantidad-imagenes').value,
+          apiImagen:         document.getElementById('api-imagen').value,
+          modeloImagen:      document.getElementById('modelo-imagen').value,
+          promptPersonalizado: resolverPrompt(tema, idioma, nivel, palabras),
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(err.error || resp.statusText);
+      }
+
+      const { id } = await resp.json();
+      logLine(`Pipeline iniciado (id: ${id.slice(-8)})`, 'hi');
+
+      // 2. Abrir SSE
+      await new Promise((resolve, reject) => {
+        const sse = new EventSource(`/curso/progreso/${id}`);
+        sseRef = sse;
+
+        sse.addEventListener('progreso', e => {
+          const d = JSON.parse(e.data);
+          logLine(`Paso ${d.paso}: ${d.mensaje}`);
+          setBadge('generando', d.mensaje);
+        });
+
+        sse.addEventListener('guion_listo', e => {
+          const d = JSON.parse(e.data);
+          logLine(`Guion listo → audio${d.numero}.txt (${d.guion.length} chars)`, 'ok');
+        });
+
+        sse.addEventListener('audio_listo', e => {
+          const d = JSON.parse(e.data);
+          logLine(`Audio listo → audio${d.numero}.mp3 (voz: ${d.nombreVoz})`, 'ok');
+        });
+
+        sse.addEventListener('imagen_lista', e => {
+          const d = JSON.parse(e.data);
+          logLine(`Imagen ${d.n}/${d.total} generada`, 'ok');
+        });
+
+        sse.addEventListener('video_listo', e => {
+          const d = JSON.parse(e.data);
+          logLine(`Video listo → video${d.numero}.mp4`, 'ok');
+        });
+
+        sse.addEventListener('finalizado', e => {
+          const d = JSON.parse(e.data);
+          const archivos = d.video
+            ? `audio${d.numero}.txt + audio${d.numero}.mp3 + video${d.numero}.mp4`
+            : `audio${d.numero}.txt + audio${d.numero}.mp3`;
+          logLine(`Completado: ${archivos}`, 'ok');
+          setBadge('ok', `#${d.numero} generado`);
+          sse.close();
+          resolve(d);
+        });
+
+        // Error emitido por el servidor (evento nombrado 'pipeline_error')
+        sse.addEventListener('pipeline_error', e => {
+          let msg = 'Error desconocido';
+          try { msg = JSON.parse(e.data).mensaje; } catch {}
+          logLine(`ERROR: ${msg}`, 'err');
+          setBadge('error', 'Error en el pipeline');
+          sse.close();
+          reject(new Error(msg));
+        });
+
+        // Error nativo de conexión SSE (corte de red, servidor caído, etc.)
+        sse.onerror = (e) => {
+          if (sse.readyState === EventSource.CLOSED) return;
+          logLine('Conexión SSE interrumpida (revisa la consola del servidor)', 'err');
+          setBadge('error', 'Conexión interrumpida');
+          sse.close();
+          reject(new Error('SSE connection lost'));
+        };
+      });
+
+      // 3. Refrescar lista
+      await cargarArchivos();
+
+    } catch (err) {
+      if (sseRef) sseRef.close();
+      logLine(err.message, 'err');
+      setBadge('error', err.message);
+    } finally {
+      document.getElementById('btn-generar').disabled = false;
+    }
+  }
+
+  // ── Lista de archivos ────────────────────────────────────────────────────
+  async function cargarArchivos() {
+    const contenedor = document.getElementById('lista-archivos');
+    try {
+      const resp = await fetch('/curso/archivos');
+      const lista = await resp.json();
+
+      if (!lista.length) {
+        contenedor.innerHTML = '<div id="lista-vacia">Todavía no hay archivos generados.</div>';
+        return;
+      }
+
+      contenedor.innerHTML = lista.map(a => renderArchivo(a)).join('');
+      // Asignar eventos de toggle texto
+      contenedor.querySelectorAll('.texto-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const num = btn.dataset.num;
+          const contenido = document.getElementById(`texto-${num}`);
+          const abierto = contenido.classList.toggle('visible');
+          btn.classList.toggle('open', abierto);
+          btn.querySelector('.label').textContent = abierto ? 'Ocultar guion' : 'Ver guion';
+        });
+      });
+      // Botones copiar
+      contenedor.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const num = btn.dataset.num;
+          const texto = document.getElementById(`texto-${num}`).textContent;
+          await navigator.clipboard.writeText(texto).catch(() => {});
+          btn.classList.add('copied');
+          btn.textContent = '✓ Copiado';
+          setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '⧉ Copiar'; }, 2000);
+        });
+      });
+    } catch (err) {
+      contenedor.innerHTML = `<div style="color:var(--error);font-size:.88rem;">Error al cargar archivos: ${err.message}</div>`;
+    }
+  }
+
+  function renderArchivo(a) {
+    const tieneTexto = a.texto && a.texto.trim().length > 0;
+
+    const linksHtml = [
+      a.video ? `<a href="${a.video}" download>↓ MP4</a>` : '',
+      `<a href="${a.mp3}" download>↓ MP3</a>`,
+      `<a href="${a.txt}" download>↓ TXT</a>`,
+    ].filter(Boolean).join('');
+
+    const mediaHtml = a.video
+      ? `<video controls preload="none" style="width:100%;border-radius:8px;margin-bottom:10px;background:#000;">
+           <source src="${a.video}" type="video/mp4">
+         </video>
+         <audio controls preload="none" src="${a.mp3}" style="margin-bottom:10px;"></audio>`
+      : `<audio controls preload="none" src="${a.mp3}" style="margin-bottom:10px;"></audio>`;
+
+    return `
+      <div class="archivo-item">
+        <div class="archivo-header">
+          <span class="num-badge">${a.video ? '🎬' : '🎵'} #${a.numero}</span>
+          <span class="archivo-nombre">${a.video ? 'video' : 'audio'}${a.numero}</span>
+          <div class="archivo-links">${linksHtml}</div>
+        </div>
+
+        ${mediaHtml}
+
+        ${tieneTexto ? `
+          <button class="texto-toggle" data-num="${a.numero}">
+            <span class="arrow">▶</span>
+            <span class="label">Ver guion</span>
+          </button>
+          <div class="texto-contenido" id="texto-${a.numero}">${a.texto.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          <button class="copy-btn" data-num="${a.numero}">⧉ Copiar</button>
+        ` : `<div style="color:var(--muted);font-size:.8rem;">(sin texto guardado)</div>`}
+      </div>
+    `;
+  }
+
+  // ── Inicialización ───────────────────────────────────────────────────────
+  cargarArchivos();
+</script>
+</body>
+</html>

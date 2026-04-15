@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
@@ -20,6 +21,56 @@ const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = r
 
 // ── Inicialización ────────────────────────────────────────────────────────────
 crearCarpetas();
+
+// Directorio para el servicio de videos de curso
+const DIR_CURSO = path.join(__dirname, 'output', 'curso');
+fs.mkdirSync(DIR_CURSO, { recursive: true });
+
+// Voces Google TTS por idioma y género (espejo de services/audio.js)
+const CURSO_VOCES_GOOGLE = {
+  de: { masculino: 'de-DE-Neural2-B', femenino: 'de-DE-Neural2-A' },
+  en: { masculino: 'en-US-Neural2-D', femenino: 'en-US-Neural2-F' },
+  es: { masculino: 'es-US-Neural2-B', femenino: 'es-US-Neural2-A' },
+  fr: { masculino: 'fr-FR-Neural2-B', femenino: 'fr-FR-Neural2-A' },
+  pt: { masculino: 'pt-BR-Neural2-B', femenino: 'pt-BR-Neural2-A' },
+};
+const CURSO_LANG_CODE = {
+  de: 'de-DE', en: 'en-US', es: 'es-US', fr: 'fr-FR', pt: 'pt-BR',
+};
+const CURSO_LANG_NAMES = {
+  de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
+  fr: 'French (Français)', pt: 'Portuguese (Português)',
+};
+
+/** Devuelve el siguiente número de secuencia disponible en output/curso/ */
+function cursosiguienteNumero() {
+  const archivos = fs.existsSync(DIR_CURSO) ? fs.readdirSync(DIR_CURSO) : [];
+  const nums = archivos
+    .map(f => { const m = f.match(/^(audio|video)(\d+)\.(mp3|txt|mp4)$/); return m ? parseInt(m[2]) : 0; })
+    .filter(n => n > 0);
+  return nums.length ? Math.max(...nums) + 1 : 1;
+}
+
+/** Lista todos los archivos de curso ordenados por número descendente */
+function cursoListarArchivos() {
+  if (!fs.existsSync(DIR_CURSO)) return [];
+  const archivos = fs.readdirSync(DIR_CURSO);
+  const nums = new Set();
+  archivos.forEach(f => { const m = f.match(/^(audio|video)(\d+)\.(mp3|txt|mp4)$/); if (m) nums.add(parseInt(m[2])); });
+  return [...nums].sort((a, b) => b - a).map(n => {
+    const txtPath   = path.join(DIR_CURSO, `audio${n}.txt`);
+    const videoPath = path.join(DIR_CURSO, `video${n}.mp4`);
+    let texto = '';
+    try { texto = fs.readFileSync(txtPath, 'utf-8'); } catch {}
+    return {
+      numero: n,
+      mp3:   `/output/curso/audio${n}.mp3`,
+      txt:   `/output/curso/audio${n}.txt`,
+      video: fs.existsSync(videoPath) ? `/output/curso/video${n}.mp4` : null,
+      texto,
+    };
+  });
+}
 
 // Multer para subida de imagen de referencia
 const uploadRef = multer({
@@ -56,6 +107,8 @@ app.use('/output', express.static(path.join(__dirname, 'output')));
 
 // SSE clients del pipeline principal
 const sseClients = new Map();
+// SSE clients del servicio de videos de curso
+const sseCursoClients = new Map();
 // SSE clients de la utilidad de imágenes
 const sseImgClients = new Map();
 // SSE clients de la utilidad de audio
@@ -543,6 +596,186 @@ app.post('/reenviar/:id', async (req, res) => {
     console.error(`[${ts()}] Reenvío ERROR [${id}]:`, err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── GET /curso/archivos ────────────────────────────────────────────────────────
+app.get('/curso/archivos', (req, res) => {
+  res.json(cursoListarArchivos());
+});
+
+// ── GET /curso/progreso/:id — SSE para el pipeline de curso ───────────────────
+app.get('/curso/progreso/:id', (req, res) => {
+  const { id } = req.params;
+  if (sseCursoClients.size >= seg.MAX_SSE_CLIENTES) {
+    return res.status(429).json({ error: 'Demasiadas conexiones activas.' });
+  }
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  sseCursoClients.set(id, res);
+  const hb = setInterval(() => { try { res.write(': hb\n\n'); } catch {} }, 20000);
+  req.on('close', () => { clearInterval(hb); sseCursoClients.delete(id); });
+});
+
+// ── POST /curso/generar — Guion OpenAI + Audio Google TTS → output/curso/ ─────
+app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
+  const ts = () => new Date().toTimeString().slice(0, 8);
+  const tema    = seg.sanitizarTema(req.body.tema);
+  const idioma  = ['de', 'en', 'es', 'fr', 'pt'].includes(req.body.idioma) ? req.body.idioma : 'de';
+  const genero  = req.body.genero === 'femenino' ? 'femenino' : 'masculino';
+  const nivel            = ['A1','A2','B1','B2','C1','C2'].includes(req.body.nivel) ? req.body.nivel : 'B1';
+  const palabras         = req.body.palabras ? String(req.body.palabras).trim().slice(0, 300) : '';
+  const modo             = req.body.modo === 'video' ? 'video' : 'audio';
+  const cantidadImagenes = seg.validarCantidad(req.body.cantidadImagenes ?? 3, 5);
+  const apiImagen        = ['openai', 'google'].includes(req.body.apiImagen) ? req.body.apiImagen : 'openai';
+  const MODELOS_IMG_OPENAI = ['gpt-image-1', 'gpt-image-1-mini'];
+  const modeloImagen = apiImagen === 'google'
+    ? 'imagen-3.0-generate-002'
+    : (MODELOS_IMG_OPENAI.includes(req.body.modeloImagen) ? req.body.modeloImagen : 'gpt-image-1');
+  // Prompt personalizado: se acepta si viene del frontend (máx. 3000 chars)
+  const promptPersonalizado = req.body.promptPersonalizado
+    ? String(req.body.promptPersonalizado).trim().slice(0, 3000)
+    : null;
+
+  if (!tema) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
+
+  const id = 'curso-' + uuidv4();
+  res.json({ id });
+
+  (async () => {
+    const emit = (evento, datos) => {
+      const cliente = sseCursoClients.get(id);
+      if (cliente) try { cliente.write(`event: ${evento}\ndata: ${JSON.stringify(datos)}\n\n`); } catch {}
+    };
+
+    try {
+      // ── PASO 1: Número de secuencia ───────────────────────────────────────
+      const numero = cursosiguienteNumero();
+      const rutaTxt = path.join(DIR_CURSO, `audio${numero}.txt`);
+      const rutaMp3 = path.join(DIR_CURSO, `audio${numero}.mp3`);
+      const langName = CURSO_LANG_NAMES[idioma];
+
+      emit('progreso', { paso: 1, mensaje: `Generando guion en ${langName}...` });
+      console.log(`[${ts()}] Curso: generando audio${numero} idioma=${idioma} genero=${genero} tema="${tema}"`);
+
+      // ── PASO 2: Guion con OpenAI ──────────────────────────────────────────
+      const palabrasLine = palabras ? `- Naturally incorporate these words or phrases: ${palabras}\n` : '';
+      const promptDefault = `You are a professional online course instructor. Write a spoken script for a short educational video about the topic below.\n\nRules:\n- The script must be entirely in ${langName}.\n- Language level: ${nivel} — adjust vocabulary, sentence complexity, and grammar accordingly.\n- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.\n- Target length: 150–220 words (approximately 1–2 minutes when spoken).\n${palabrasLine}- Write ONLY the spoken text, nothing else.\n\nTopic: ${tema}`;
+      const promptGuion = promptPersonalizado || promptDefault;
+
+      const respGuion = await require('axios').post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: promptGuion }],
+          temperature: 0.8,
+          max_tokens: 800,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const guion = respGuion.data.choices[0].message.content.trim();
+      fs.writeFileSync(rutaTxt, guion, 'utf-8');
+      emit('guion_listo', { numero, guion, rutaTxt: `/output/curso/audio${numero}.txt` });
+      console.log(`[${ts()}] Curso: guion guardado en ${rutaTxt}`);
+
+      // ── PASO 3: Audio con Google TTS ──────────────────────────────────────
+      emit('progreso', { paso: 2, mensaje: `Sintetizando audio ${idioma} (${genero})...` });
+
+      const { GoogleAuth } = require('google-auth-library');
+      const auth = new GoogleAuth({
+        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      });
+      const googleClient = await auth.getClient();
+      const { token } = await googleClient.getAccessToken();
+
+      const vocesIdioma = CURSO_VOCES_GOOGLE[idioma];
+      const nombreVoz   = vocesIdioma[genero];
+      const langCode    = CURSO_LANG_CODE[idioma];
+      const textoTts    = Buffer.byteLength(guion, 'utf8') > 4800 ? guion.slice(0, 4800) : guion;
+
+      const respTts = await require('axios').post(
+        'https://texttospeech.googleapis.com/v1/text:synthesize',
+        {
+          input: { text: textoTts },
+          voice: { languageCode: langCode, name: nombreVoz },
+          audioConfig: { audioEncoding: 'MP3' },
+        },
+        {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        }
+      );
+
+      const buffer = Buffer.from(respTts.data.audioContent, 'base64');
+      fs.writeFileSync(rutaMp3, buffer);
+      emit('audio_listo', { numero, rutaMp3: `/output/curso/audio${numero}.mp3`, nombreVoz, langCode });
+      console.log(`[${ts()}] Curso: audio guardado en ${rutaMp3}`);
+
+      // ── PASO 4 (opcional): Imágenes + Video ───────────────────────────────
+      let rutaVideoCurso = null;
+      if (modo === 'video') {
+        // — Imágenes —
+        emit('progreso', { paso: 3, mensaje: `Generando ${cantidadImagenes} imagen(es) con ${apiImagen}...` });
+        console.log(`[${ts()}] Curso: iniciando imágenes api=${apiImagen} modelo=${modeloImagen} cantidad=${cantidadImagenes}`);
+
+        const promptImagen = `Professional educational illustration for an online course video about: ${tema}. Language level ${nivel}. Clean, informative, no text overlays, suitable for e-learning.`;
+
+        let rutasOrdenadas;
+        try {
+          rutasOrdenadas = await generarImagenesDirectas(
+            promptImagen, cantidadImagenes, id, modeloImagen, apiImagen,
+            async (n, _ruta) => {
+              emit('imagen_lista', { n, total: cantidadImagenes });
+              console.log(`[${ts()}] Curso: imagen ${n}/${cantidadImagenes} lista.`);
+            },
+            null, 'medium'
+          );
+        } catch (errImg) {
+          throw new Error(`Error en imágenes: ${errImg.message}`);
+        }
+
+        if (!rutasOrdenadas || rutasOrdenadas.length === 0) {
+          throw new Error('generarImagenesDirectas devolvió un array vacío.');
+        }
+        console.log(`[${ts()}] Curso: ${rutasOrdenadas.length} imágenes listas. Iniciando FFmpeg...`);
+
+        // — Video —
+        emit('progreso', { paso: 4, mensaje: 'Renderizando video con FFmpeg...' });
+        rutaVideoCurso = path.join(DIR_CURSO, `video${numero}.mp4`);
+        try {
+          await generarVideo(rutaMp3, rutasOrdenadas, rutaVideoCurso, null);
+        } catch (errVid) {
+          throw new Error(`Error FFmpeg: ${errVid.message}`);
+        }
+
+        emit('video_listo', { numero, video: `/output/curso/video${numero}.mp4` });
+        console.log(`[${ts()}] Curso: video guardado en ${rutaVideoCurso}`);
+      }
+
+      // ── FINALIZADO ────────────────────────────────────────────────────────
+      emit('finalizado', {
+        numero,
+        guion,
+        mp3:   `/output/curso/audio${numero}.mp3`,
+        txt:   `/output/curso/audio${numero}.txt`,
+        ...(rutaVideoCurso ? { video: `/output/curso/video${numero}.mp4` } : {}),
+      });
+      console.log(`[${ts()}] Curso: audio${numero} completado (${idioma}, modo=${modo}).`);
+
+    } catch (err) {
+      const mensaje = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message || String(err));
+      console.error(`[curso/generar] ERROR:`, mensaje);
+      console.error(err?.stack || err);
+      emit('pipeline_error', { mensaje });
+    }
+  })();
 });
 
 // ── Middleware de errores global ──────────────────────────────────────────────

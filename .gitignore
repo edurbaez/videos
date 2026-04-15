@@ -13,6 +13,8 @@ output/subtitulos/*
 !output/subtitulos/.gitkeep
 output/videos/*
 !output/videos/.gitkeep
+output/curso/*
+!output/curso/.gitkeep
 
 # Datos de runtime
 historial.json
