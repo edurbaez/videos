@@ -632,7 +632,7 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
   const MODELOS_IMG_OPENAI = ['gpt-image-1', 'gpt-image-1-mini'];
   const modeloImagen = apiImagen === 'google'
     ? 'imagen-3.0-generate-002'
-    : (MODELOS_IMG_OPENAI.includes(req.body.modeloImagen) ? req.body.modeloImagen : 'gpt-image-1');
+    : (MODELOS_IMG_OPENAI.includes(req.body.modeloImagen) ? req.body.modeloImagen : 'gpt-image-1-mini');
   // Prompt personalizado: se acepta si viene del frontend (máx. 3000 chars)
   const promptPersonalizado = req.body.promptPersonalizado
     ? String(req.body.promptPersonalizado).trim().slice(0, 3000)

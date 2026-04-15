@@ -615,8 +615,8 @@ Topic: {tema}`;
       wrap.style.display = '';
       // Restaurar opciones OpenAI si se cambió
       if (!sel.querySelector('option[value="gpt-image-1"]')) {
-        sel.innerHTML = '<option value="gpt-image-1" selected>gpt-image-1 — Potente</option>'
-                      + '<option value="gpt-image-1-mini">gpt-image-1-mini — Económico</option>';
+        sel.innerHTML = '<option value="gpt-image-1">gpt-image-1 — Potente</option>'
+                      + '<option value="gpt-image-1-mini" selected>gpt-image-1-mini — Económico</option>';
       }
     }
   }
