@@ -1,0 +1,15 @@
+{
+  "canales": [
+    {
+      "nombre": "motivacion",
+      "label": "@Motivacióndiaria-u1c",
+      "descripcion": "Canal de motivación diaria"
+    },
+    {
+      "nombre": "1Minutoaleman",
+      "label": "@1MinutoAlemán",
+      "descripcion": "Canal de motivación diaria"
+    }
+    
+  ]
+}

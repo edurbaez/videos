@@ -18,6 +18,7 @@ const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, obt
 const { generarVideo } = require('./services/video');
 const { generarSubtitulos } = require('./services/subtitulos');
 const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = require('./services/telegram');
+const yt = require('./services/youtube');
 
 // ── Inicialización ────────────────────────────────────────────────────────────
 crearCarpetas();
@@ -206,6 +207,23 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
     return res.status(400).json({ error: e.message });
   }
 
+  // YouTube upload (opcional)
+  const subirYoutube = req.body.subirYoutube === true || req.body.subirYoutube === 'true';
+  const privacidadYoutube = ['public', 'unlisted', 'private'].includes(req.body.privacidadYoutube)
+    ? req.body.privacidadYoutube : 'private';
+  let canalYoutube = null;
+  if (subirYoutube) {
+    const canalesConf = yt.listarCanalesConfig();
+    const canalEncontrado = canalesConf.find(c => c.nombre === req.body.canalYoutube);
+    if (!canalEncontrado) {
+      return res.status(400).json({ error: `Canal YouTube "${req.body.canalYoutube}" no encontrado en youtube-channels.json.` });
+    }
+    if (!canalEncontrado.autorizado) {
+      return res.status(400).json({ error: `Canal "${canalEncontrado.label}" no autorizado. Visita /youtube/auth?canal=${canalEncontrado.nombre}` });
+    }
+    canalYoutube = canalEncontrado.nombre;
+  }
+
   // Cargar config del nicho — falla rápido si el nicho no existe
   let nichoConfig;
   try {
@@ -294,7 +312,32 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
         emitirEvento(id, 'telegram_error_video', { mensaje: errTg.message });
       }
 
-      // ── PASO 5: Historial ────────────────────────────────────────────────
+      // ── PASO 5: YouTube (opcional) ───────────────────────────────────────
+      let youtubeResult = null;
+      if (subirYoutube) {
+        try {
+          emitirEvento(id, 'youtube_subiendo', {});
+          console.log(`[${ts()}] YouTube: generando metadatos...`);
+          const meta = await yt.generarMetadatosShorts(tema, guion_final, nichoConfig.nombre);
+          emitirEvento(id, 'youtube_metadatos', { titulo: meta.titulo, descripcion: meta.descripcion, tags: meta.tags });
+          console.log(`[${ts()}] YouTube: subiendo video al canal "${canalYoutube}"...`);
+          youtubeResult = await yt.subirVideo({
+            rutaVideo:   rutaVideo(id),
+            titulo:      meta.titulo,
+            descripcion: meta.descripcion,
+            tags:        meta.tags,
+            canal:       canalYoutube,
+            privacidad:  privacidadYoutube,
+          });
+          emitirEvento(id, 'youtube_listo', { url: youtubeResult.url, videoId: youtubeResult.videoId });
+          console.log(`[${ts()}] YouTube: publicado → ${youtubeResult.url}`);
+        } catch (errYT) {
+          console.error(`[${ts()}] YouTube ERROR [${id}]:`, errYT.message);
+          emitirEvento(id, 'youtube_error', { mensaje: errYT.message });
+        }
+      }
+
+      // ── PASO 6: Historial ────────────────────────────────────────────────
       const cantidadNum = parseInt(cantidad);
       guardarEntrada({
         id,
@@ -328,6 +371,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
         audio: `/output/audios/audio-${id}.mp3`,
         imagenes: Array.from({ length: cantidadNum }, (_, i) => `/output/imagenes/imagen-${id}-${i + 1}.png`),
         video: `/output/videos/video-${id}.mp4`,
+        ...(youtubeResult ? { youtubeUrl: youtubeResult.url } : {}),
       });
 
       console.log(`[${ts()}] Pipeline: generación ${id} completada con éxito.`);
@@ -637,6 +681,27 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
   const promptPersonalizado = req.body.promptPersonalizado
     ? String(req.body.promptPersonalizado).trim().slice(0, 3000)
     : null;
+  // Prompt de humanización: revisión del guion antes de sintetizar audio
+  const promptHumanizacion = req.body.promptHumanizacion
+    ? String(req.body.promptHumanizacion).trim().slice(0, 3000)
+    : null;
+
+  // YouTube upload (opcional, solo en modo video)
+  const subirYoutube     = (req.body.subirYoutube === true || req.body.subirYoutube === 'true') && modo === 'video';
+  const privacidadYoutube = ['public', 'unlisted', 'private'].includes(req.body.privacidadYoutube)
+    ? req.body.privacidadYoutube : 'private';
+  let canalYoutube = null;
+  if (subirYoutube) {
+    const canalesConf = yt.listarCanalesConfig();
+    const canalEncontrado = canalesConf.find(c => c.nombre === req.body.canalYoutube);
+    if (!canalEncontrado) {
+      return res.status(400).json({ error: `Canal YouTube "${req.body.canalYoutube}" no encontrado en youtube-channels.json.` });
+    }
+    if (!canalEncontrado.autorizado) {
+      return res.status(400).json({ error: `Canal "${canalEncontrado.label}" no autorizado. Visita /youtube/auth?canal=${canalEncontrado.nombre}` });
+    }
+    canalYoutube = canalEncontrado.nombre;
+  }
 
   if (!tema) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
 
@@ -680,13 +745,54 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
         }
       );
 
-      const guion = respGuion.data.choices[0].message.content.trim();
+      const guionBorrador = respGuion.data.choices[0].message.content.trim();
+      emit('guion_listo', { numero, guion: guionBorrador });
+      console.log(`[${ts()}] Curso: borrador generado (${guionBorrador.length} chars)`);
+
+      // ── PASO 2b: Humanización del guion ──────────────────────────────────
+      emit('progreso', { paso: 2, mensaje: 'Humanizando y ajustando guion para audio...' });
+
+      const HUMANIZACION_DEFAULT = `You are a voice-over script editor specialized in text-to-speech optimization. Revise the following script to make it sound more natural and fluid when read aloud.
+
+Rules:
+- Keep the exact same language ({idioma_code}), topic, and language level as the original.
+- Replace formal or rigid sentence structures with natural spoken patterns.
+- Add smooth transitions and connective phrases between ideas.
+- Vary sentence length to create a natural spoken rhythm.
+- Avoid lists, colons, semicolons, academic phrasing, and abrupt topic shifts.
+- Do NOT add new content, change the meaning, or alter the target language.
+- Output ONLY the revised script text, nothing else.
+
+Script to revise:
+{guion}`;
+
+      const promptHumanizacionFinal = (promptHumanizacion || HUMANIZACION_DEFAULT)
+        .replace(/\{guion\}/g, guionBorrador)
+        .replace(/\{idioma_code\}/g, idioma);
+
+      const respHuman = await require('axios').post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: promptHumanizacionFinal }],
+          temperature: 0.6,
+          max_tokens: 900,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const guion = respHuman.data.choices[0].message.content.trim();
       fs.writeFileSync(rutaTxt, guion, 'utf-8');
-      emit('guion_listo', { numero, guion, rutaTxt: `/output/curso/audio${numero}.txt` });
-      console.log(`[${ts()}] Curso: guion guardado en ${rutaTxt}`);
+      emit('revision_lista', { numero, guion, rutaTxt: `/output/curso/audio${numero}.txt` });
+      console.log(`[${ts()}] Curso: guion humanizado guardado en ${rutaTxt}`);
 
       // ── PASO 3: Audio con Google TTS ──────────────────────────────────────
-      emit('progreso', { paso: 2, mensaje: `Sintetizando audio ${idioma} (${genero})...` });
+      emit('progreso', { paso: 3, mensaje: `Sintetizando audio ${idioma} (${genero})...` });
 
       const { GoogleAuth } = require('google-auth-library');
       const auth = new GoogleAuth({
@@ -722,7 +828,7 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
       let rutaVideoCurso = null;
       if (modo === 'video') {
         // — Imágenes —
-        emit('progreso', { paso: 3, mensaje: `Generando ${cantidadImagenes} imagen(es) con ${apiImagen}...` });
+        emit('progreso', { paso: 4, mensaje: `Generando ${cantidadImagenes} imagen(es) con ${apiImagen}...` });
         console.log(`[${ts()}] Curso: iniciando imágenes api=${apiImagen} modelo=${modeloImagen} cantidad=${cantidadImagenes}`);
 
         const promptImagen = `Professional educational illustration for an online course video about: ${tema}. Language level ${nivel}. Clean, informative, no text overlays, suitable for e-learning.`;
@@ -747,7 +853,7 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
         console.log(`[${ts()}] Curso: ${rutasOrdenadas.length} imágenes listas. Iniciando FFmpeg...`);
 
         // — Video —
-        emit('progreso', { paso: 4, mensaje: 'Renderizando video con FFmpeg...' });
+        emit('progreso', { paso: 5, mensaje: 'Renderizando video con FFmpeg...' });
         rutaVideoCurso = path.join(DIR_CURSO, `video${numero}.mp4`);
         try {
           await generarVideo(rutaMp3, rutasOrdenadas, rutaVideoCurso, null);
@@ -759,13 +865,42 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
         console.log(`[${ts()}] Curso: video guardado en ${rutaVideoCurso}`);
       }
 
+      // ── PASO YouTube (opcional) ───────────────────────────────────────────
+      let youtubeResult = null;
+      if (subirYoutube && rutaVideoCurso) {
+        try {
+          emit('progreso', { paso: 6, mensaje: 'Generando título y descripción para YouTube...' });
+          const meta = await yt.generarMetadatosYoutube(tema, guion, idioma, nivel);
+          emit('youtube_metadatos', { titulo: meta.titulo, descripcion: meta.descripcion, tags: meta.tags });
+          console.log(`[${ts()}] YouTube: metadatos listos → "${meta.titulo}"`);
+
+          emit('youtube_subiendo', {});
+          console.log(`[${ts()}] YouTube: subiendo video al canal "${canalYoutube}"...`);
+          youtubeResult = await yt.subirVideo({
+            rutaVideo:   rutaVideoCurso,
+            titulo:      meta.titulo,
+            descripcion: meta.descripcion,
+            tags:        meta.tags,
+            canal:       canalYoutube,
+            privacidad:  privacidadYoutube,
+          });
+          emit('youtube_listo', { url: youtubeResult.url, videoId: youtubeResult.videoId });
+          console.log(`[${ts()}] YouTube: video publicado → ${youtubeResult.url}`);
+        } catch (errYT) {
+          console.error(`[curso/generar] YouTube ERROR:`, errYT.message);
+          emit('youtube_error', { mensaje: errYT.message });
+          // Error no fatal: el video ya está generado localmente
+        }
+      }
+
       // ── FINALIZADO ────────────────────────────────────────────────────────
       emit('finalizado', {
         numero,
         guion,
         mp3:   `/output/curso/audio${numero}.mp3`,
         txt:   `/output/curso/audio${numero}.txt`,
-        ...(rutaVideoCurso ? { video: `/output/curso/video${numero}.mp4` } : {}),
+        ...(rutaVideoCurso  ? { video: `/output/curso/video${numero}.mp4` } : {}),
+        ...(youtubeResult   ? { youtubeUrl: youtubeResult.url }            : {}),
       });
       console.log(`[${ts()}] Curso: audio${numero} completado (${idioma}, modo=${modo}).`);
 
@@ -776,6 +911,45 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
       emit('pipeline_error', { mensaje });
     }
   })();
+});
+
+// ── GET /youtube/canales ───────────────────────────────────────────────────────
+app.get('/youtube/canales', (req, res) => {
+  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
+    return res.status(503).json({ error: 'YouTube no configurado. Agrega YOUTUBE_CLIENT_ID y YOUTUBE_CLIENT_SECRET al .env' });
+  }
+  res.json(yt.listarCanalesConfig());
+});
+
+// ── GET /youtube/auth — Inicia el flujo OAuth para un canal ───────────────────
+app.get('/youtube/auth', (req, res) => {
+  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
+    return res.status(503).send('YouTube no configurado en .env');
+  }
+  const canales = yt.listarCanalesConfig();
+  const canal   = canales.find(c => c.nombre === req.query.canal);
+  if (!canal) {
+    return res.status(400).send(`Canal "${req.query.canal}" no encontrado en youtube-channels.json.`);
+  }
+  res.redirect(yt.obtenerUrlAuth(canal.nombre));
+});
+
+// ── GET /youtube/callback — Recibe el código OAuth de Google ──────────────────
+app.get('/youtube/callback', async (req, res) => {
+  const { code, state } = req.query;
+  if (!code || !state) return res.status(400).send('Parámetros faltantes en el callback de OAuth.');
+  try {
+    await yt.manejarCallback(code, state);
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="font-family:system-ui,sans-serif;padding:40px;background:#0d0d0f;color:#e2e8f0;">
+  <h2 style="color:#22c55e;">&#10003; Canal "${state}" autorizado correctamente</h2>
+  <p style="color:#94a3b8;margin-top:12px;">Ya puedes cerrar esta pestaña y volver a
+    <a href="/videos_curso.html" style="color:#818cf8;">Videos Curso</a>.
+  </p>
+</body></html>`);
+  } catch (err) {
+    res.status(500).send(`Error al procesar el callback: ${err.message}`);
+  }
 });
 
 // ── Middleware de errores global ──────────────────────────────────────────────

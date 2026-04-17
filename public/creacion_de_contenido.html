@@ -16,6 +16,7 @@
       --accent2: #a855f7;
       --success: #22c55e;
       --error:   #ef4444;
+      --warn:    #f59e0b;
       --text:    #e2e8f0;
       --muted:   #64748b;
       --radius:  12px;
@@ -566,6 +567,67 @@
     .ref-preview-wrap .ref-quitar { font-size:0.78rem; color:#e55; cursor:pointer; text-decoration:underline; margin-left:6px; }
     .ref-badge { display:inline-block; font-size:0.72rem; background:#1a472a; color:#6fcf97; border-radius:4px; padding:2px 7px; margin-left:6px; vertical-align:middle; }
     .ref-only-openai { font-size:0.78rem; color:var(--muted); margin-top:6px; font-style:italic; }
+
+    /* ── Toggle switch YouTube ── */
+    .yt-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .yt-row-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .yt-switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+    .yt-switch input { opacity: 0; width: 0; height: 0; }
+    .yt-slider {
+      position: absolute; inset: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .yt-slider:before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      top: 2px; left: 2px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: transform .2s, background .2s;
+    }
+    .yt-switch input:checked + .yt-slider { background: #ef444422; border-color: #ef4444; }
+    .yt-switch input:checked + .yt-slider:before { transform: translateX(18px); background: #ef4444; }
+    .yt-panel {
+      background: #1a1014;
+      border: 1px solid #ef444430;
+      border-radius: 8px;
+      padding: 14px;
+      margin-top: 4px;
+    }
+    .yt-auth-ok   { color: var(--success); font-size: 0.8rem; }
+    .yt-auth-warn { color: var(--warn); font-size: 0.8rem; }
+    .yt-auth-warn a { color: var(--accent2); text-decoration: underline; }
+    .yt-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #7f1d1d22;
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .yt-badge.ok { background: #15803d22; border-color: var(--success); color: var(--success); }
   </style>
 </head>
 <body>
@@ -578,6 +640,7 @@
     <a href="#audio">🎙️ Audio</a>
     <a href="#imagenes">🖼️ Imágenes</a>
     <a href="#video">🎬 Video</a>
+    <a href="#youtube">▶️ YouTube</a>
   </div>
 </nav>
 
@@ -862,6 +925,37 @@
         </div>
       </div>
 
+      <!-- YouTube Upload -->
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);" id="v_ytSection">
+        <div class="yt-row">
+          <span class="yt-row-label">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#ef4444"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.75 15.5v-7l6.5 3.5-6.5 3.5z"/></svg>
+            Subir a YouTube
+          </span>
+          <label class="yt-switch">
+            <input type="checkbox" id="v_ytActivo" onchange="vToggleYoutube()">
+            <span class="yt-slider"></span>
+          </label>
+        </div>
+        <div class="yt-panel" id="v_ytPanel" style="display:none;">
+          <div style="margin-bottom:10px;">
+            <label for="v_ytCanal" style="margin-bottom:6px;">Canal de YouTube</label>
+            <select id="v_ytCanal" onchange="vActualizarEstadoAuth()">
+              <option value="">Cargando canales...</option>
+            </select>
+          </div>
+          <div id="v_ytAuthStatus" style="margin-bottom:10px;"></div>
+          <div>
+            <label for="v_ytPrivacidad" style="margin-bottom:6px;">Privacidad del video</label>
+            <select id="v_ytPrivacidad">
+              <option value="private">Privado</option>
+              <option value="unlisted">No listado</option>
+              <option value="public">Público</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <button class="btn-gen" id="v_btnGenerar" style="margin-top:18px">Generar video</button>
     </div>
 
@@ -876,6 +970,7 @@
         <li id="v_step-imagenes"><span class="step-icon">⏳</span><span id="v_stepImagenesLabel">Generando imágenes...</span></li>
         <li id="v_step-video"><span class="step-icon">⏳</span><span>Renderizando video...</span></li>
         <li id="v_step-telegram"><span class="step-icon">⏳</span><span>Enviando a Telegram...</span></li>
+        <li id="v_step-youtube" class="hidden"><span class="step-icon">⏳</span><span>Subiendo a YouTube...</span></li>
       </ul>
     </div>
 
@@ -895,6 +990,7 @@
     <div class="card hidden" id="v_cardResultado">
       <h3>Resultado</h3>
       <div class="telegram-badge" id="v_telegramBadge">✅ Enviado a Telegram</div>
+      <div class="yt-badge hidden" id="v_youtubeBadge"></div>
 
       <div class="section-title">Guion final</div>
       <div class="copy-wrapper" style="margin-bottom:16px">
@@ -938,6 +1034,28 @@
     </div>
   </section>
 
+  <hr class="section-divider" />
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECCIÓN 4: YOUTUBE
+  ════════════════════════════════════════════════════════ -->
+  <section id="youtube">
+    <div class="section-header">
+      <div class="section-icon">▶️</div>
+      <div>
+        <h2>Canales de YouTube</h2>
+        <p>Gestiona la autorización OAuth de tus canales para publicar videos automáticamente.</p>
+      </div>
+    </div>
+
+    <div class="card" id="yt_cardCanales">
+      <h3>Canales configurados</h3>
+      <div id="yt_listaCanales">
+        <p style="color:var(--muted);font-size:0.9rem">Cargando canales...</p>
+      </div>
+    </div>
+  </section>
+
 </div><!-- /container -->
 
 <script>
@@ -965,7 +1083,7 @@ function formatearFecha(iso) {
 }
 
 // Marcar link activo del nav al hacer scroll
-const sections = ['audio','imagenes','video'];
+const sections = ['audio','imagenes','video','youtube'];
 const navLinks  = document.querySelectorAll('.section-links a');
 window.addEventListener('scroll', () => {
   let current = '';
@@ -1238,6 +1356,7 @@ let vVoz      = 'femenino';
 let vTTS      = 'google';
 let vEstilo   = 'cinematico';
 let vRefPath  = null;
+let ytCanales = [];
 
 async function vSubirReferencia(input) {
   const file = input.files[0];
@@ -1288,6 +1407,84 @@ function vAplicarDefaultsNicho(nichos) {
 }
 
 vCargarNichos();
+
+async function vCargarCanalesYoutube() {
+  const sel = document.getElementById('v_ytCanal');
+  try {
+    const resp = await fetch('/youtube/canales');
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      sel.innerHTML = `<option value="">⚠ ${escHtml(err.error || 'YouTube no configurado')}</option>`;
+      return;
+    }
+    ytCanales = await resp.json();
+    if (!ytCanales.length) {
+      sel.innerHTML = '<option value="">Sin canales en youtube-channels.json</option>';
+      return;
+    }
+    sel.innerHTML = ytCanales.map(c =>
+      `<option value="${escHtml(c.nombre)}">${escHtml(c.label || c.nombre)}${c.autorizado ? ' ✓' : ' ⚠'}</option>`
+    ).join('');
+    vActualizarEstadoAuth();
+  } catch {
+    sel.innerHTML = '<option value="">Error al cargar canales</option>';
+  }
+}
+
+function vActualizarEstadoAuth() {
+  const nombre = document.getElementById('v_ytCanal').value;
+  const canal  = ytCanales.find(c => c.nombre === nombre);
+  const div    = document.getElementById('v_ytAuthStatus');
+  if (!canal) { div.innerHTML = ''; return; }
+  if (canal.autorizado) {
+    div.innerHTML = `<span class="yt-auth-ok">✓ Canal autorizado</span>`;
+  } else {
+    div.innerHTML = `<span class="yt-auth-warn">⚠ No autorizado —
+      <a href="/youtube/auth?canal=${encodeURIComponent(canal.nombre)}" target="_blank">Autorizar ahora</a>
+      (abre nueva pestaña, luego recarga)</span>`;
+  }
+}
+
+function vToggleYoutube() {
+  const activo = document.getElementById('v_ytActivo').checked;
+  document.getElementById('v_ytPanel').style.display = activo ? 'block' : 'none';
+  document.getElementById('v_step-youtube').classList.toggle('hidden', !activo);
+  if (activo) vCargarCanalesYoutube();
+}
+
+async function ytCargarPanelCanales() {
+  const contenedor = document.getElementById('yt_listaCanales');
+  try {
+    const resp = await fetch('/youtube/canales');
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      contenedor.innerHTML = `<p style="color:var(--error);font-size:0.9rem">⚠ ${escHtml(err.error || 'YouTube no configurado')}</p>`;
+      return;
+    }
+    const canales = await resp.json();
+    if (!canales.length) {
+      contenedor.innerHTML = '<p style="color:var(--muted);font-size:0.9rem">No hay canales configurados en youtube-channels.json.</p>';
+      return;
+    }
+    contenedor.innerHTML = canales.map(c => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-weight:600;font-size:0.95rem">${escHtml(c.label || c.nombre)}</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-top:2px">${escHtml(c.descripcion || '')}</div>
+        </div>
+        <div style="flex-shrink:0;margin-left:16px;">
+          ${c.autorizado
+            ? `<span class="yt-auth-ok" style="font-size:0.85rem">✓ Autorizado</span>`
+            : `<a href="/youtube/auth?canal=${encodeURIComponent(c.nombre)}" target="_blank"
+                style="font-size:0.85rem;color:var(--accent2);text-decoration:underline;">Autorizar</a>`
+          }
+        </div>
+      </div>
+    `).join('');
+  } catch {
+    contenedor.innerHTML = '<p style="color:var(--error);font-size:0.9rem">Error al cargar canales.</p>';
+  }
+}
 
 function vCheckVideoReady() {
   if (vSubtitulosListos && vImagenesListas) vMarcarPaso('v_step-video','active');
@@ -1359,6 +1556,13 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
     li.classList.remove('active','done');
     li.querySelector('.step-icon').textContent = '⏳';
   });
+  const ytStep = document.getElementById('v_step-youtube');
+  ytStep.classList.remove('active','done');
+  ytStep.querySelector('.step-icon').textContent = '⏳';
+  ytStep.querySelector('span:last-child').textContent = 'Subiendo a YouTube...';
+  const ytBadge = document.getElementById('v_youtubeBadge');
+  ytBadge.classList.add('hidden');
+  ytBadge.className = 'yt-badge hidden';
   vSubtitulosListos = false;
   vImagenesListas   = false;
   document.getElementById('v_stepImagenesLabel').textContent = 'Generando imágenes...';
@@ -1376,7 +1580,13 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
     const resp = await fetch('/generar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema, nicho, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS, estilo: vEstilo, escenario: vEscenario, refImagePath: vRefPath }),
+      body: JSON.stringify({
+        tema, nicho, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS,
+        estilo: vEstilo, escenario: vEscenario, refImagePath: vRefPath,
+        subirYoutube:      document.getElementById('v_ytActivo').checked,
+        canalYoutube:      document.getElementById('v_ytCanal').value,
+        privacidadYoutube: document.getElementById('v_ytPrivacidad').value,
+      }),
     });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || 'Error al iniciar.'); }
     const { id } = await resp.json();
@@ -1496,7 +1706,38 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
       vMarcarPaso('v_step-telegram','active');
     });
 
-    vES.addEventListener('telegram_listo', () => { vMarcarPaso('v_step-telegram','done'); });
+    vES.addEventListener('telegram_listo', () => {
+      vMarcarPaso('v_step-telegram','done');
+      if (document.getElementById('v_ytActivo').checked) vMarcarPaso('v_step-youtube','active');
+    });
+
+    vES.addEventListener('youtube_metadatos', e => {
+      const { titulo } = JSON.parse(e.data);
+      const li = document.getElementById('v_step-youtube');
+      if (li) li.querySelector('span:last-child').textContent = `YouTube: "${titulo}"`;
+    });
+
+    vES.addEventListener('youtube_subiendo', () => {
+      vMarcarPaso('v_step-youtube','active');
+    });
+
+    vES.addEventListener('youtube_listo', e => {
+      const { url } = JSON.parse(e.data);
+      vMarcarPaso('v_step-youtube','done');
+      const badge = document.getElementById('v_youtubeBadge');
+      badge.className = 'yt-badge ok';
+      badge.innerHTML = `✅ Publicado en YouTube — <a href="${escHtml(url)}" target="_blank" style="color:inherit;text-decoration:underline;margin-left:4px">Ver video</a>`;
+      badge.classList.remove('hidden');
+    });
+
+    vES.addEventListener('youtube_error', e => {
+      const { mensaje } = JSON.parse(e.data);
+      vMarcarPaso('v_step-youtube','error');
+      const badge = document.getElementById('v_youtubeBadge');
+      badge.className = 'yt-badge';
+      badge.innerHTML = `❌ YouTube: ${escHtml(mensaje)}`;
+      badge.classList.remove('hidden');
+    });
 
     vES.addEventListener('telegram_error_video', e => {
       const { mensaje } = JSON.parse(e.data);
@@ -1629,6 +1870,7 @@ async function vReenviar(id, btn) {
 // Init
 vCargarHistorial();
 vCargarGaleria();
+ytCargarPanelCanales();
 </script>
 </body>
 </html>

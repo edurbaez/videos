@@ -380,6 +380,54 @@
     }
     .btn-reset-prompt:hover { color: var(--warn); border-color: var(--warn); }
 
+    /* ── Toggle switch YouTube ──────────────────────────────────────────── */
+    .yt-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .yt-row-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .yt-switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+    .yt-switch input { opacity: 0; width: 0; height: 0; }
+    .yt-slider {
+      position: absolute; inset: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .yt-slider:before {
+      content: '';
+      position: absolute;
+      height: 14px; width: 14px;
+      left: 3px; bottom: 3px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: transform .2s, background .2s;
+    }
+    .yt-switch input:checked + .yt-slider { background: #ef444422; border-color: #ef4444; }
+    .yt-switch input:checked + .yt-slider:before { transform: translateX(18px); background: #ef4444; }
+
+    .yt-panel {
+      background: #1a1014;
+      border: 1px solid #ef444430;
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 4px;
+    }
+    .yt-auth-ok   { color: var(--success); font-size: 0.8rem; }
+    .yt-auth-warn { color: var(--warn); font-size: 0.8rem; }
+    .yt-auth-warn a { color: var(--accent2); text-decoration: underline; }
+
     /* ── Separador de sección ───────────────────────────────────────────── */
     .section-header {
       display: flex;
@@ -499,6 +547,37 @@
             </select>
           </div>
         </div>
+
+        <!-- ── YouTube Upload ────────────────────────────────────────────── -->
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+          <div class="yt-row">
+            <span class="yt-row-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#ef4444"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.75 15.5v-7l6.5 3.5-6.5 3.5z"/></svg>
+              Subir a YouTube
+            </span>
+            <label class="yt-switch">
+              <input type="checkbox" id="yt-activo" onchange="toggleYoutubePanel()">
+              <span class="yt-slider"></span>
+            </label>
+          </div>
+          <div class="yt-panel" id="yt-panel" style="display:none;">
+            <div style="margin-bottom:10px;">
+              <label for="yt-canal" style="margin-bottom:6px;">Canal de YouTube</label>
+              <select id="yt-canal" onchange="actualizarEstadoAuth()">
+                <option value="">Cargando canales...</option>
+              </select>
+            </div>
+            <div id="yt-auth-status" style="margin-bottom:10px;"></div>
+            <div>
+              <label for="yt-privacidad" style="margin-bottom:6px;">Privacidad del video</label>
+              <select id="yt-privacidad">
+                <option value="private" selected>Privado (revisar antes de publicar)</option>
+                <option value="unlisted">No listado</option>
+                <option value="public">Público</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -517,7 +596,7 @@
     <!-- Editor de prompt colapsable -->
     <div class="field" style="margin-bottom:16px;">
       <button class="prompt-toggle" id="prompt-toggle" onclick="togglePrompt()">
-        <span>✏️</span> Personalizar prompt de OpenAI
+        <span>✏️</span> Personalizar prompt de guion
         <span class="pt-arrow">▶</span>
       </button>
       <div class="prompt-editor" id="prompt-editor">
@@ -525,6 +604,21 @@
         <div class="prompt-hint">
           <span>Placeholders: <code>{tema}</code> <code>{idioma}</code> <code>{nivel}</code> <code>{palabras}</code> — la línea con <code>{palabras}</code> se omite si está vacío</span>
           <button class="btn-reset-prompt" onclick="resetPrompt()">↺ Restablecer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Editor de prompt de humanización colapsable -->
+    <div class="field" style="margin-bottom:16px;">
+      <button class="prompt-toggle" id="prompt-human-toggle" onclick="togglePromptHuman()">
+        <span>🎙️</span> Personalizar prompt de humanización
+        <span class="pt-arrow">▶</span>
+      </button>
+      <div class="prompt-editor" id="prompt-human-editor">
+        <textarea id="prompt-humanizacion" rows="12" spellcheck="false"></textarea>
+        <div class="prompt-hint">
+          <span>Placeholders: <code>{guion}</code> (borrador generado) <code>{idioma_code}</code> (ej: de, en, es)</span>
+          <button class="btn-reset-prompt" onclick="resetPromptHuman()">↺ Restablecer</button>
         </div>
       </div>
     </div>
@@ -570,14 +664,30 @@ Rules:
 
 Topic: {tema}`;
 
+  // ── Prompt de humanización por defecto ───────────────────────────────────
+  const PROMPT_HUMANIZACION_DEFAULT = `You are a voice-over script editor specialized in text-to-speech optimization. Revise the following script to make it sound more natural and fluid when read aloud.
+
+Rules:
+- Keep the exact same language ({idioma_code}), topic, and language level as the original.
+- Replace formal or rigid sentence structures with natural spoken patterns.
+- Add smooth transitions and connective phrases between ideas.
+- Vary sentence length to create a natural spoken rhythm.
+- Avoid lists, colons, semicolons, academic phrasing, and abrupt topic shifts.
+- Do NOT add new content, change the meaning, or alter the target language.
+- Output ONLY the revised script text, nothing else.
+
+Script to revise:
+{guion}`;
+
   const LANG_NAMES = {
     de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
     fr: 'French (Français)', pt: 'Portuguese (Português)',
   };
 
-  // Inicializa el textarea con el template al cargar
+  // Inicializa los textareas con los templates al cargar
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prompt-custom').value = PROMPT_DEFAULT;
+    document.getElementById('prompt-humanizacion').value = PROMPT_HUMANIZACION_DEFAULT;
   });
 
   function togglePrompt() {
@@ -589,6 +699,17 @@ Topic: {tema}`;
 
   function resetPrompt() {
     document.getElementById('prompt-custom').value = PROMPT_DEFAULT;
+  }
+
+  function togglePromptHuman() {
+    const btn    = document.getElementById('prompt-human-toggle');
+    const editor = document.getElementById('prompt-human-editor');
+    const abierto = editor.classList.toggle('visible');
+    btn.classList.toggle('open', abierto);
+  }
+
+  function resetPromptHuman() {
+    document.getElementById('prompt-humanizacion').value = PROMPT_HUMANIZACION_DEFAULT;
   }
 
   // ── Estado de la UI ──────────────────────────────────────────────────────
@@ -603,6 +724,11 @@ Topic: {tema}`;
     document.getElementById('btn-generar').textContent = m === 'video'
       ? 'Generar guion + audio + video'
       : 'Generar guion + audio';
+    if (m === 'video') cargarCanalesYoutube();
+    if (m === 'audio') {
+      document.getElementById('yt-activo').checked = false;
+      document.getElementById('yt-panel').style.display = 'none';
+    }
   }
 
   function actualizarModeloImagen() {
@@ -703,6 +829,10 @@ Topic: {tema}`;
           apiImagen:         document.getElementById('api-imagen').value,
           modeloImagen:      document.getElementById('modelo-imagen').value,
           promptPersonalizado: resolverPrompt(tema, idioma, nivel, palabras),
+          promptHumanizacion: document.getElementById('prompt-humanizacion').value.trim(),
+          subirYoutube:      document.getElementById('yt-activo').checked && modoSeleccionado === 'video',
+          canalYoutube:      document.getElementById('yt-canal').value,
+          privacidadYoutube: document.getElementById('yt-privacidad').value,
         }),
       });
 
@@ -727,7 +857,12 @@ Topic: {tema}`;
 
         sse.addEventListener('guion_listo', e => {
           const d = JSON.parse(e.data);
-          logLine(`Guion listo → audio${d.numero}.txt (${d.guion.length} chars)`, 'ok');
+          logLine(`Borrador generado (${d.guion.length} chars) — humanizando...`, 'hi');
+        });
+
+        sse.addEventListener('revision_lista', e => {
+          const d = JSON.parse(e.data);
+          logLine(`Guion humanizado → audio${d.numero}.txt (${d.guion.length} chars)`, 'ok');
         });
 
         sse.addEventListener('audio_listo', e => {
@@ -745,12 +880,33 @@ Topic: {tema}`;
           logLine(`Video listo → video${d.numero}.mp4`, 'ok');
         });
 
+        sse.addEventListener('youtube_metadatos', e => {
+          const d = JSON.parse(e.data);
+          logLine(`YouTube: título generado → "${d.titulo}"`, 'hi');
+        });
+
+        sse.addEventListener('youtube_subiendo', () => {
+          logLine('YouTube: subiendo video...', 'hi');
+          setBadge('generando', 'Subiendo a YouTube...');
+        });
+
+        sse.addEventListener('youtube_listo', e => {
+          const d = JSON.parse(e.data);
+          logLine(`YouTube: publicado → ${d.url}`, 'ok');
+        });
+
+        sse.addEventListener('youtube_error', e => {
+          const d = JSON.parse(e.data);
+          logLine(`YouTube ERROR: ${d.mensaje}`, 'err');
+        });
+
         sse.addEventListener('finalizado', e => {
           const d = JSON.parse(e.data);
           const archivos = d.video
             ? `audio${d.numero}.txt + audio${d.numero}.mp3 + video${d.numero}.mp4`
             : `audio${d.numero}.txt + audio${d.numero}.mp3`;
           logLine(`Completado: ${archivos}`, 'ok');
+          if (d.youtubeUrl) logLine(`YouTube: ${d.youtubeUrl}`, 'ok');
           setBadge('ok', `#${d.numero} generado`);
           sse.close();
           resolve(d);
@@ -786,6 +942,52 @@ Topic: {tema}`;
     } finally {
       document.getElementById('btn-generar').disabled = false;
     }
+  }
+
+  // ── YouTube helpers ──────────────────────────────────────────────────────
+  let ytCanales = [];
+
+  async function cargarCanalesYoutube() {
+    const sel = document.getElementById('yt-canal');
+    try {
+      const resp = await fetch('/youtube/canales');
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        sel.innerHTML = `<option value="">⚠ ${err.error || 'YouTube no configurado'}</option>`;
+        return;
+      }
+      ytCanales = await resp.json();
+      if (!ytCanales.length) {
+        sel.innerHTML = '<option value="">Sin canales en youtube-channels.json</option>';
+        return;
+      }
+      sel.innerHTML = ytCanales.map(c =>
+        `<option value="${c.nombre}">${c.label}${c.autorizado ? '' : ' ⚠ sin autorizar'}</option>`
+      ).join('');
+      actualizarEstadoAuth();
+    } catch {
+      sel.innerHTML = '<option value="">Error al cargar canales</option>';
+    }
+  }
+
+  function actualizarEstadoAuth() {
+    const nombre  = document.getElementById('yt-canal').value;
+    const canal   = ytCanales.find(c => c.nombre === nombre);
+    const div     = document.getElementById('yt-auth-status');
+    if (!canal) { div.innerHTML = ''; return; }
+    if (canal.autorizado) {
+      div.innerHTML = `<span class="yt-auth-ok">&#10003; Canal autorizado</span>`;
+    } else {
+      div.innerHTML = `<span class="yt-auth-warn">&#9888; No autorizado —
+        <a href="/youtube/auth?canal=${canal.nombre}" target="_blank">Autorizar ahora</a>
+        (se abre en nueva pestaña, luego recarga esta página)</span>`;
+    }
+  }
+
+  function toggleYoutubePanel() {
+    const activo = document.getElementById('yt-activo').checked;
+    document.getElementById('yt-panel').style.display = activo ? 'block' : 'none';
+    if (activo) cargarCanalesYoutube();
   }
 
   // ── Lista de archivos ────────────────────────────────────────────────────

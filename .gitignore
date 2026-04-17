@@ -19,6 +19,9 @@ output/curso/*
 # Datos de runtime
 historial.json
 
+# Tokens OAuth de YouTube (contienen refresh_token — nunca commitear)
+youtube-tokens-*.json
+
 # Archivos personales/IDE y notas de planificación
 .claude/
 sugerencias.md
