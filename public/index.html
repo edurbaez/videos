@@ -93,6 +93,47 @@
       gap: 8px;
     }
     .feature span { font-size: 1.2rem; }
+
+    .services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-top: 40px;
+      text-align: left;
+    }
+    .service-link {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      text-decoration: none;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .service-link:hover {
+      border-color: var(--accent2);
+      transform: translateY(-2px);
+    }
+    .service-link .icon { font-size: 1.4rem; }
+    .service-link .desc {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .section-label {
+      margin-top: 36px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-align: left;
+    }
   </style>
 </head>
 <body>
@@ -109,6 +150,52 @@
       <div class="feature"><span>🎙️</span> Audio con TTS</div>
       <div class="feature"><span>🖼️</span> Imágenes con IA</div>
       <div class="feature"><span>📹</span> Video completo</div>
+    </div>
+
+    <p class="section-label">Todos los servicios</p>
+    <div class="services">
+      <a href="/creacion_de_contenido.html" class="service-link">
+        <span class="icon">🎬</span>
+        <div>
+          Creación de contenido
+          <div class="desc">Pipeline completo de video</div>
+        </div>
+      </a>
+      <a href="/guion.html" class="service-link">
+        <span class="icon">✍️</span>
+        <div>
+          Guion
+          <div class="desc">Solo guion + caption</div>
+        </div>
+      </a>
+      <a href="/audio.html" class="service-link">
+        <span class="icon">🎙️</span>
+        <div>
+          Audio
+          <div class="desc">Síntesis TTS</div>
+        </div>
+      </a>
+      <a href="/imagenes.html" class="service-link">
+        <span class="icon">🖼️</span>
+        <div>
+          Imágenes
+          <div class="desc">Generación con IA</div>
+        </div>
+      </a>
+      <a href="/audios-de-aleman.html" class="service-link">
+        <span class="icon">🇩🇪</span>
+        <div>
+          Audios de alemán
+          <div class="desc">TTS en alemán</div>
+        </div>
+      </a>
+      <a href="/videos_curso.html" class="service-link">
+        <span class="icon">📚</span>
+        <div>
+          Videos de curso
+          <div class="desc">Contenido educativo</div>
+        </div>
+      </a>
     </div>
   </div>
 </body>
