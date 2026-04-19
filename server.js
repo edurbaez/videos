@@ -108,6 +108,8 @@ app.use('/output', express.static(path.join(__dirname, 'output')));
 
 // SSE clients del pipeline principal
 const sseClients = new Map();
+// Promesas en espera de confirmación de guion editado: id → { resolve, reject }
+const pendingContinuar = new Map();
 // SSE clients del servicio de videos de curso
 const sseCursoClients = new Map();
 // SSE clients de la utilidad de imágenes
@@ -169,6 +171,18 @@ app.get('/progreso/:id', (req, res) => {
   });
 });
 
+// ── POST /continuar/:id — Confirmar guion editado y reanudar pipeline ────────
+app.post('/continuar/:id', (req, res) => {
+  const { id } = req.params;
+  const pending = pendingContinuar.get(id);
+  if (!pending) return res.status(404).json({ error: 'No hay pipeline en espera para este ID.' });
+  const guion = typeof req.body.guion === 'string' ? req.body.guion.trim().slice(0, 5000) : null;
+  if (!guion) return res.status(400).json({ error: 'El campo "guion" es obligatorio.' });
+  pending.resolve(guion);
+  pendingContinuar.delete(id);
+  res.json({ ok: true });
+});
+
 // ── POST /generar — Pipeline principal ───────────────────────────────────────
 app.post('/generar', seg.limitarGenerar, async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
@@ -182,6 +196,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
     estilo,
     escenario,
     quality     = 'medium',
+    editarGuion = false,
   } = req.body;
 
   // Sanitización de inputs del usuario
@@ -254,18 +269,38 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
       const { guion_final, guion_audio } = await generarGuion(tema, id, nichoConfig);
       emitirEvento(id, 'guion_listo', { guion_final });
 
+      // ── PAUSA OPCIONAL: esperar confirmación del usuario para editar guion ──
+      let guionParaPipeline = guion_final;
+      let guionAudioParaPipeline = guion_audio;
+      if (editarGuion) {
+        console.log(`[${ts()}] Pipeline: esperando confirmación de guion (editarGuion=true)`);
+        guionParaPipeline = await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            pendingContinuar.delete(id);
+            reject(new Error('Tiempo de espera agotado para confirmación del guion (10 min).'));
+          }, 10 * 60 * 1000);
+          pendingContinuar.set(id, {
+            resolve: (g) => { clearTimeout(timer); resolve(g); },
+            reject:  (e) => { clearTimeout(timer); reject(e); },
+          });
+        });
+        guionAudioParaPipeline = guionParaPipeline;
+        console.log(`[${ts()}] Pipeline: guion confirmado, reanudando`);
+        emitirEvento(id, 'guion_confirmado', {});
+      }
+
       // ── PASO 2: Caption + (Audio → Subtítulos) + Imágenes en paralelo ──────
       console.log(`[${ts()}] Pipeline: paso 2 — caption, audio+subtítulos, imágenes en paralelo`);
       const [caption, rutaSRT, rutasImagenes] = await Promise.all([
 
         // Caption
-        generarCaption(guion_final, nichoConfig).then(c => {
+        generarCaption(guionParaPipeline, nichoConfig).then(c => {
           emitirEvento(id, 'caption_listo', { caption: c });
           return c;
         }),
 
         // Audio → (Subtítulos si están activados)
-        generarAudio(guion_audio, rutaAudio(id), vozFinal, ttsFinal, nichoConfig.idioma).then(async () => {
+        generarAudio(guionAudioParaPipeline, rutaAudio(id), vozFinal, ttsFinal, nichoConfig.idioma).then(async () => {
           emitirEvento(id, 'audio_listo', { ruta: `/output/audios/audio-${id}.mp3` });
           if (!subtitulos) {
             emitirEvento(id, 'subtitulos_listos', {});
@@ -284,7 +319,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
         }),
 
         // Imágenes
-        generarImagenes(guion_final, parseInt(cantidad), id, (n, prompt) => {
+        generarImagenes(guionParaPipeline, parseInt(cantidad), id, (n, prompt) => {
           emitirEvento(id, 'prompt_imagen', { n, total: parseInt(cantidad), prompt });
         }, modeloFinal, apiFinal, estiloFinal, escenarioFinal, (escenas) => {
           emitirEvento(id, 'storyboard_listo', { escenas });
@@ -318,7 +353,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
         try {
           emitirEvento(id, 'youtube_subiendo', {});
           console.log(`[${ts()}] YouTube: generando metadatos...`);
-          const meta = await yt.generarMetadatosShorts(tema, guion_final, nichoConfig.nombre);
+          const meta = await yt.generarMetadatosShorts(tema, guionParaPipeline, nichoConfig.nombre);
           emitirEvento(id, 'youtube_metadatos', { titulo: meta.titulo, descripcion: meta.descripcion, tags: meta.tags });
           console.log(`[${ts()}] YouTube: subiendo video al canal "${canalYoutube}"...`);
           youtubeResult = await yt.subirVideo({
@@ -345,7 +380,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
         nicho,
         nombreNicho: nichoConfig.nombre,
         caption,
-        guion: guion_final,
+        guion: guionParaPipeline,
         fecha: new Date().toISOString(),
         parametros: {
           voz:      vozFinal,
@@ -366,7 +401,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
       // Evento final con todos los datos para el frontend
       emitirEvento(id, 'finalizado', {
         id,
-        guion: guion_final,
+        guion: guionParaPipeline,
         caption,
         audio: `/output/audios/audio-${id}.mp3`,
         imagenes: Array.from({ length: cantidadNum }, (_, i) => `/output/imagenes/imagen-${id}-${i + 1}.png`),

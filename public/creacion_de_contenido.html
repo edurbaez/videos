@@ -789,6 +789,18 @@
         </div>
       </div>
 
+      <!-- Edición de guion -->
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+        <div class="yt-row">
+          <span class="yt-row-label">✍️ Editar guion antes de continuar</span>
+          <label class="yt-switch">
+            <input type="checkbox" id="v_editarGuion">
+            <span class="yt-slider"></span>
+          </label>
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:4px">El pipeline se pausará tras generar el guion para que puedas editarlo antes de producir audio e imágenes.</p>
+      </div>
+
       <button class="btn-gen" id="v_btnGenerar" style="margin-top:18px">Generar video</button>
     </div>
 
@@ -805,6 +817,20 @@
         <li id="v_step-telegram"><span class="step-icon">⏳</span><span>Enviando a Telegram...</span></li>
         <li id="v_step-youtube" class="hidden"><span class="step-icon">⏳</span><span>Subiendo a YouTube...</span></li>
       </ul>
+    </div>
+
+    <!-- Editar guion (aparece cuando editarGuion=true y llega guion_listo) -->
+    <div class="card hidden" id="v_cardEditarGuion">
+      <h3>✍️ Editar guion</h3>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">Revisa y edita el guion antes de generar audio e imágenes. El pipeline está en pausa.</p>
+      <div class="copy-wrapper" style="margin-bottom:16px">
+        <textarea id="v_guionEditable" rows="12"></textarea>
+        <button class="btn-copy" onclick="copiar('v_guionEditable', this)">Copiar</button>
+      </div>
+      <div style="display:flex;gap:12px">
+        <button class="btn-gen" id="v_btnContinuar" style="margin-top:0;flex:1" onclick="vContinuarPipeline()">Continuar con este guion →</button>
+        <button class="btn btn-secondary" style="margin-top:0" onclick="vCancelarEdicion()">Cancelar</button>
+      </div>
     </div>
 
     <!-- Storyboard (video) -->
@@ -938,6 +964,39 @@ let vTTS      = 'google';
 let vEstilo   = 'cinematico';
 let vRefPath  = null;
 let ytCanales = [];
+let vCurrentId = null;
+
+async function vContinuarPipeline() {
+  const guion = document.getElementById('v_guionEditable').value.trim();
+  if (!guion) { alert('El guion no puede estar vacío.'); return; }
+  const btn = document.getElementById('v_btnContinuar');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  try {
+    const resp = await fetch(`/continuar/${vCurrentId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guion }),
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    // El servidor emitirá guion_confirmado por SSE, que actualiza la UI
+    document.getElementById('v_outGuion').value = guion;
+  } catch (err) {
+    vMostrarError('Error al confirmar guion: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Continuar con este guion →';
+  }
+}
+
+function vCancelarEdicion() {
+  if (!confirm('¿Cancelar la generación? El pipeline quedará abandonado.')) return;
+  if (vES) { vES.close(); vES = null; }
+  document.getElementById('v_cardEditarGuion').classList.add('hidden');
+  document.getElementById('v_cardProgreso').classList.add('hidden');
+  const btn = document.getElementById('v_btnGenerar');
+  btn.disabled = false;
+  btn.textContent = 'Generar video';
+}
 
 async function vSubirReferencia(input) {
   const file = input.files[0];
@@ -1164,6 +1223,7 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
       body: JSON.stringify({
         tema, nicho, cantidad, genero: vVoz, modelo, api, subtitulos: false, tts: vTTS,
         estilo: vEstilo, escenario: vEscenario, refImagePath: vRefPath,
+        editarGuion: document.getElementById('v_editarGuion').checked,
         subirYoutube:      document.getElementById('v_ytActivo').checked,
         canalYoutube:      document.getElementById('v_ytCanal').value,
         privacidadYoutube: document.getElementById('v_ytPrivacidad').value,
@@ -1171,13 +1231,34 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
     });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || 'Error al iniciar.'); }
     const { id } = await resp.json();
+    vCurrentId = id;
+
+    document.getElementById('v_cardEditarGuion').classList.add('hidden');
+    document.getElementById('v_btnContinuar').disabled = false;
+    document.getElementById('v_btnContinuar').textContent = 'Continuar con este guion →';
 
     if (vES) vES.close();
     vES = new EventSource(`/progreso/${id}`);
 
     vES.addEventListener('guion_listo', e => {
+      const { guion_final } = JSON.parse(e.data);
       vMarcarPaso('v_step-guion','done');
-      document.getElementById('v_outGuion').value = JSON.parse(e.data).guion_final;
+      document.getElementById('v_outGuion').value = guion_final;
+      if (document.getElementById('v_editarGuion').checked) {
+        // Modo edición: mostrar card y esperar confirmación
+        document.getElementById('v_guionEditable').value = guion_final;
+        document.getElementById('v_cardEditarGuion').classList.remove('hidden');
+        document.getElementById('v_cardEditarGuion').scrollIntoView({ behavior: 'smooth' });
+      } else {
+        vMarcarPaso('v_step-caption','active');
+        vMarcarPaso('v_step-audio','active');
+        vMarcarPaso('v_step-imagenes','active');
+        document.getElementById('v_stepImagenesLabel').textContent = 'Generando storyboard...';
+      }
+    });
+
+    vES.addEventListener('guion_confirmado', () => {
+      document.getElementById('v_cardEditarGuion').classList.add('hidden');
       vMarcarPaso('v_step-caption','active');
       vMarcarPaso('v_step-audio','active');
       vMarcarPaso('v_step-imagenes','active');
