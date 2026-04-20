@@ -760,8 +760,10 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
       console.log(`[${ts()}] Curso: generando audio${numero} idioma=${idioma} genero=${genero} tema="${tema}"`);
 
       // ── PASO 2: Guion con OpenAI ──────────────────────────────────────────
-      const palabrasLine = palabras ? `- Naturally incorporate these words or phrases: ${palabras}\n` : '';
-      const promptDefault = `You are a professional online course instructor. Write a spoken script for a short educational video about the topic below.\n\nRules:\n- The script must be entirely in ${langName}.\n- Language level: ${nivel} — adjust vocabulary, sentence complexity, and grammar accordingly.\n- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.\n- Target length: 150–220 words (approximately 1–2 minutes when spoken).\n${palabrasLine}- Write ONLY the spoken text, nothing else.\n\nTopic: ${tema}`;
+      const palabrasLine = palabras
+        ? `\n⚠ PRIORITY REQUIREMENT — You MUST use ALL of the following words or phrases at least once in the script. This is mandatory, not optional:\n${palabras}\nBuild the script around these words whenever possible.\n`
+        : '';
+      const promptDefault = `You are a professional online course instructor. Write a spoken script for a short educational video about the topic below.\n\nRules:\n- The script must be entirely in ${langName}.\n- Language level: ${nivel} — adjust vocabulary, sentence complexity, and grammar accordingly.\n- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.\n- Target length: 150–220 words (approximately 1–2 minutes when spoken).\n- Write ONLY the spoken text, nothing else.\n${palabrasLine}\nTopic: ${tema}`;
       const promptGuion = promptPersonalizado || promptDefault;
 
       const respGuion = await require('axios').post(
@@ -984,6 +986,24 @@ app.get('/youtube/callback', async (req, res) => {
 </body></html>`);
   } catch (err) {
     res.status(500).send(`Error al procesar el callback: ${err.message}`);
+  }
+});
+
+// ── GET /youtube/estadisticas/:canal ─────────────────────────────────────────
+app.get('/youtube/estadisticas/:canal', async (req, res) => {
+  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
+    return res.status(503).json({ error: 'YouTube no configurado en .env' });
+  }
+  const { canal } = req.params;
+  const canales   = yt.listarCanalesConfig();
+  if (!canales.find(c => c.nombre === canal)) {
+    return res.status(404).json({ error: `Canal "${canal}" no encontrado.` });
+  }
+  try {
+    const data = await yt.obtenerEstadisticasCanal(canal);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

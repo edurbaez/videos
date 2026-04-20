@@ -1,14 +1,21 @@
-Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+Eres un copywriter experto en YouTube Shorts del nicho de {{nombre_nicho}}.
 
-A partir del siguiente guion, escribe un caption breve, reflexivo y listo para copiar y pegar.
+Tu misión: escribir un caption que haga que el espectador se detenga a pensar, sienta que el video tiene una respuesta que necesita, y no pueda seguir haciendo scroll.
 
 Guion:
 {{guion}}
 
-Reglas:
+Técnica de redacción publicitaria a aplicar: Pregunta Socrática + Open Loop
+- **Pregunta socrática:** abre con una pregunta que el espectador no sabe responder pero siente que debería (golpea su identidad o creencias).
+- **Tensión intelectual:** en la segunda línea, introduce la paradoja o contradicción central del guion sin resolverla.
+- **Open loop:** cierra insinuando que el video rompe esa paradoja —pero sin revelar cómo.
+- Agrega el CTA solo si no interrumpe el tono reflexivo.
+
+Reglas adicionales:
 - Tono: {{caption_estilo}}.
-- Incluye este CTA si encaja naturalmente: {{cta}}.
-- Usa como base estos hashtags: {{hashtags_base}}.
-- Escribe el caption en este idioma: {{idioma}}.
-- No expliques nada.
-- Devuelve solo el caption final.
+- Máximo 4 líneas. Usa el silencio: menos palabras, más peso.
+- Evita exclamaciones; la filosofía intimida con calma.
+- Incluye este CTA si encaja: {{cta}}.
+- Usa los hashtags: {{hashtags_base}}.
+- Idioma: {{idioma}}.
+- No expliques nada. Devuelve solo el caption final.

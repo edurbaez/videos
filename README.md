@@ -251,7 +251,7 @@ Timeout: 10 minutos. Guion máximo: 5000 caracteres.
 
 Los metadatos (título, descripción, tags) se generan con GPT a partir del guion.
 
-**Endpoints:** `GET /youtube/canales` · `GET /youtube/auth` · `GET /youtube/callback`
+**Endpoints:** `GET /youtube/canales` · `GET /youtube/auth` · `GET /youtube/callback` · `GET /youtube/estadisticas/:canal`
 
 ---
 
@@ -300,7 +300,40 @@ Idiomas: `de` (alemán), `en` (inglés), `es` (español), `fr` (francés), `pt` 
 
 ---
 
-### 8. Historial y galería
+### 8. Estadísticas de canales YouTube
+
+Consulta métricas de un canal autorizado usando la YouTube Data API v3.
+
+**Endpoint:** `GET /youtube/estadisticas/:canal`
+
+**Requiere:** canal autorizado via OAuth (`GET /youtube/auth`).
+
+**Datos del canal:**
+- Suscriptores, vistas totales, total de videos
+- Promedio de vistas por video
+- Fecha de creación del canal
+
+**Datos por video (últimos 10, ordenados por vistas):**
+
+| Campo | Descripción |
+|---|---|
+| `vistas` | Total de reproducciones |
+| `likes` / `comentarios` | Interacciones |
+| `engagement` | `(likes + comentarios) / vistas × 100` |
+| `vistasPorDia` | `vistas / días desde publicación` |
+| `duracion` | Duración en formato `M:SS` |
+| `privacidad` | `public`, `unlisted` o `private` |
+
+**Métricas derivadas del conjunto:**
+- Mejor día de la semana para publicar (por promedio de vistas)
+- Engagement promedio del canal
+- Promedio de vistas entre los últimos 10 videos
+
+**Frontend:** `public/estadisticas.html`
+
+---
+
+### 9. Historial y galería
 
 | Endpoint | Descripción |
 |---|---|
@@ -353,7 +386,7 @@ proyecto/
 │   ├── index.html                  Página principal
 │   ├── creacion_de_contenido.html  Generador de Video
 │   ├── guion.html · audio.html · imagenes.html
-│   ├── audios-de-aleman.html · videos_curso.html
+│   ├── audios-de-aleman.html · videos_curso.html · estadisticas.html
 └── output/
     ├── audios/ · imagenes/ · videos/ · subtitulos/
     ├── referencias/ · curso/

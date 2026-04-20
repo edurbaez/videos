@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Estadísticas de canales — YouTube</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0d0f;
+      --surface:  #18181c;
+      --surface2: #1e1e24;
+      --border:   #2e2e38;
+      --accent:   #7c3aed;
+      --accent2:  #a855f7;
+      --green:    #22c55e;
+      --red:      #f87171;
+      --yellow:   #facc15;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --gold:     #f59e0b;
+      --silver:   #94a3b8;
+      --bronze:   #b45309;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px 64px;
+    }
+
+    /* ── Header ── */
+    .header {
+      max-width: 940px;
+      margin: 0 auto 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .header a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.2s;
+    }
+    .header a:hover { color: var(--text); }
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      max-width: 940px;
+      margin: 0 auto 32px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls label { color: var(--muted); font-size: 0.9rem; }
+    select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+      min-width: 220px;
+    }
+    select:focus { border-color: var(--accent2); }
+    .btn {
+      padding: 10px 22px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn:hover  { opacity: 0.88; transform: translateY(-1px); }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    /* ── State box ── */
+    .state-box {
+      max-width: 940px;
+      margin: 40px auto;
+      text-align: center;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+    .state-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .state-box.error { color: var(--red); }
+
+    /* ── Channel card ── */
+    .channel-card {
+      max-width: 940px;
+      margin: 0 auto 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .channel-card img {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: 2px solid var(--accent2);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .ch-avatar-placeholder {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 2px solid var(--accent2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; flex-shrink: 0;
+    }
+    .ch-info { flex: 1; min-width: 160px; }
+    .ch-name { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .ch-meta { font-size: 0.75rem; color: var(--muted); }
+    .ch-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+    .ch-stat { text-align: center; }
+    .ch-stat .val { font-size: 1.2rem; font-weight: 700; color: var(--accent2); }
+    .ch-stat .lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+
+    /* ── Resumen strip ── */
+    .resumen-strip {
+      max-width: 940px;
+      margin: 0 auto 28px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .resumen-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .resumen-item .r-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+    .resumen-item .r-val   { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .resumen-item .r-val.accent { color: var(--accent2); }
+    .resumen-item .r-val.green  { color: var(--green); }
+
+    /* ── Section title ── */
+    .section-title {
+      max-width: 940px;
+      margin: 0 auto 16px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── Video grid ── */
+    .video-grid {
+      max-width: 940px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+      gap: 16px;
+    }
+
+    .video-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      text-decoration: none;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      position: relative;
+    }
+    .video-card:hover {
+      border-color: var(--accent2);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px #7c3aed22;
+    }
+    .video-card.top-1 { border-color: var(--gold);   box-shadow: 0 0 0 1px #f59e0b33; }
+    .video-card.top-2 { border-color: var(--silver); }
+    .video-card.top-3 { border-color: var(--bronze); }
+
+    /* Rank badge */
+    .rank-badge {
+      position: absolute; top: 8px; left: 8px;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 800;
+      z-index: 2; box-shadow: 0 2px 8px #0008;
+    }
+    .rank-1 { background: var(--gold);   color: #1c1000; }
+    .rank-2 { background: var(--silver); color: #0f172a; }
+    .rank-3 { background: var(--bronze); color: #fff8f0; }
+
+    /* Duration badge */
+    .dur-badge {
+      position: absolute; bottom: 8px; right: 8px;
+      background: #000c; color: #fff;
+      font-size: 0.7rem; font-weight: 600;
+      padding: 2px 6px; border-radius: 4px;
+    }
+
+    /* Privacy badge */
+    .priv-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 0.65rem; font-weight: 600;
+      padding: 2px 7px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .priv-public   { background: #16532420; color: var(--green);  border: 1px solid #22c55e44; }
+    .priv-unlisted { background: #45350820; color: var(--yellow); border: 1px solid #facc1544; }
+    .priv-private  { background: #44121220; color: var(--red);    border: 1px solid #f8717144; }
+
+    /* Engagement badge */
+    .eng-badge {
+      font-size: 0.7rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 20px;
+    }
+    .eng-high { background: #16532420; color: var(--green);  border: 1px solid #22c55e44; }
+    .eng-mid  { background: #45350820; color: var(--yellow); border: 1px solid #facc1544; }
+    .eng-low  { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+    .video-thumb {
+      width: 100%; aspect-ratio: 16/9;
+      object-fit: cover; display: block;
+      background: var(--surface2);
+    }
+    .thumb-placeholder {
+      width: 100%; aspect-ratio: 16/9;
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+    }
+    .thumb-wrap { position: relative; }
+
+    .video-body {
+      padding: 12px 13px 14px;
+      display: flex; flex-direction: column; gap: 7px; flex: 1;
+    }
+    .video-title {
+      font-size: 0.86rem; font-weight: 600; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .video-meta {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .video-date { font-size: 0.7rem; color: var(--muted); }
+
+    .video-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px; margin-top: auto;
+      padding-top: 8px; border-top: 1px solid var(--border);
+    }
+    .vstat {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 1px;
+    }
+    .vstat .n    { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+    .vstat .lbl  { font-size: 0.62rem; color: var(--muted); }
+    .vstat-views .n { color: var(--accent2); }
+
+    .vstat-extra {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      padding-top: 6px;
+    }
+    .vstat-small {
+      font-size: 0.72rem; color: var(--muted);
+      display: flex; align-items: center; gap: 3px;
+    }
+    .vstat-small .n { color: var(--text); font-weight: 600; }
+
+    /* Spinner */
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <a href="/">← Inicio</a>
+    <h1>📊 Estadísticas de canales</h1>
+  </div>
+
+  <div class="controls">
+    <label for="selectCanal">Canal:</label>
+    <select id="selectCanal"><option value="">Cargando…</option></select>
+    <button class="btn" id="btnCargar" disabled>Ver estadísticas</button>
+  </div>
+
+  <div id="stateBox" class="state-box">
+    <div class="icon">📺</div>
+    <div>Selecciona un canal y haz clic en <strong>Ver estadísticas</strong></div>
+  </div>
+
+  <div id="channelCard"  style="display:none"></div>
+  <div id="resumenStrip" style="display:none" class="resumen-strip"></div>
+  <div id="sectionTitle" style="display:none" class="section-title">Últimos 10 videos · ordenados por vistas</div>
+  <div id="videoGrid"    style="display:none" class="video-grid"></div>
+
+  <script>
+    const selectCanal  = document.getElementById('selectCanal');
+    const btnCargar    = document.getElementById('btnCargar');
+    const stateBox     = document.getElementById('stateBox');
+    const channelCard  = document.getElementById('channelCard');
+    const resumenStrip = document.getElementById('resumenStrip');
+    const sectionTitle = document.getElementById('sectionTitle');
+    const videoGrid    = document.getElementById('videoGrid');
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function fmt(n) {
+      const num = Number(n);
+      if (n == null || !isFinite(num)) return '0';
+      if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
+      if (num >= 1_000)     return (num / 1_000).toFixed(1)     + 'K';
+      return String(Math.round(num));
+    }
+    function fmtFecha(iso) {
+      return new Date(iso).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    function fmtAno(iso) {
+      return new Date(iso).getFullYear();
+    }
+    function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1) : ''; }
+
+    function engClass(pct) {
+      if (pct >= 5)  return 'eng-high';
+      if (pct >= 1)  return 'eng-mid';
+      return 'eng-low';
+    }
+    function privClass(p) {
+      if (p === 'public')   return 'priv-public';
+      if (p === 'unlisted') return 'priv-unlisted';
+      return 'priv-private';
+    }
+    function privLabel(p) {
+      if (p === 'public')   return '🌐 público';
+      if (p === 'unlisted') return '🔗 no listado';
+      return '🔒 privado';
+    }
+
+    function showState(html, isError = false) {
+      stateBox.innerHTML    = html;
+      stateBox.className    = 'state-box' + (isError ? ' error' : '');
+      stateBox.style.display = '';
+      channelCard.style.display  = 'none';
+      resumenStrip.style.display = 'none';
+      sectionTitle.style.display = 'none';
+      videoGrid.style.display    = 'none';
+    }
+    function showLoading() {
+      showState('<div class="spinner"></div><div>Consultando YouTube API…</div>');
+    }
+
+    // ── Cargar canales ────────────────────────────────────────────────────────
+    async function cargarCanales() {
+      try {
+        const res     = await fetch('/youtube/canales');
+        const canales = await res.json();
+        selectCanal.innerHTML = '';
+        if (!Array.isArray(canales) || canales.length === 0) {
+          selectCanal.innerHTML = '<option value="">Sin canales configurados</option>';
+          return;
+        }
+        canales.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.nombre;
+          opt.textContent = c.label + (c.autorizado ? '' : ' (no autorizado)');
+          opt.disabled    = !c.autorizado;
+          selectCanal.appendChild(opt);
+        });
+        const primero = canales.find(c => c.autorizado);
+        if (primero) { selectCanal.value = primero.nombre; btnCargar.disabled = false; }
+      } catch {
+        selectCanal.innerHTML = '<option value="">Error al cargar canales</option>';
+      }
+    }
+    selectCanal.addEventListener('change', () => { btnCargar.disabled = !selectCanal.value; });
+
+    // ── Render channel card ───────────────────────────────────────────────────
+    function renderChannelCard(c) {
+      const avatar = c.thumbnail
+        ? `<img src="${c.thumbnail}" alt="${c.titulo}">`
+        : `<div class="ch-avatar-placeholder">📺</div>`;
+      const desde = c.creadoEn ? `Canal creado en ${fmtAno(c.creadoEn)}` : '';
+      const pais  = c.pais ? ` · ${c.pais}` : '';
+
+      channelCard.innerHTML = `
+        <div class="channel-card">
+          ${avatar}
+          <div class="ch-info">
+            <div class="ch-name">${c.titulo}</div>
+            <div class="ch-meta">${desde}${pais}</div>
+          </div>
+          <div class="ch-stats">
+            <div class="ch-stat">
+              <div class="val">${fmt(parseInt(c.suscriptores))}</div>
+              <div class="lbl">Suscriptores</div>
+            </div>
+            <div class="ch-stat">
+              <div class="val">${fmt(parseInt(c.vistasTotal))}</div>
+              <div class="lbl">Vistas totales</div>
+            </div>
+            <div class="ch-stat">
+              <div class="val">${fmt(parseInt(c.videosTotal))}</div>
+              <div class="lbl">Videos</div>
+            </div>
+            <div class="ch-stat">
+              <div class="val">${fmt(c.promedioVistasPorVideo)}</div>
+              <div class="lbl">Promedio vistas/video</div>
+            </div>
+          </div>
+        </div>`;
+      channelCard.style.display = '';
+    }
+
+    // ── Render resumen strip ──────────────────────────────────────────────────
+    function renderResumen(r) {
+      if (!r) { resumenStrip.style.display = 'none'; return; }
+      resumenStrip.innerHTML = `
+        <div class="resumen-item">
+          <div class="r-label">Mejor día para publicar</div>
+          <div class="r-val accent">${r.mejorDia ? capitalize(r.mejorDia) : '—'}</div>
+        </div>
+        <div class="resumen-item">
+          <div class="r-label">Promedio vistas (últimos 10)</div>
+          <div class="r-val">${fmt(r.promedioVistas)}</div>
+        </div>
+        <div class="resumen-item">
+          <div class="r-label">Engagement promedio</div>
+          <div class="r-val ${r.promedioEngagement >= 5 ? 'green' : ''}">${r.promedioEngagement}%</div>
+        </div>
+        <div class="resumen-item">
+          <div class="r-label">Video más visto</div>
+          <div class="r-val" style="font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.videoMasVisto || ''}">${r.videoMasVisto || '—'}</div>
+        </div>`;
+      resumenStrip.style.display = '';
+    }
+
+    // ── Render video grid ─────────────────────────────────────────────────────
+    function rankClass(i) {
+      return i === 0 ? 'top-1' : i === 1 ? 'top-2' : i === 2 ? 'top-3' : '';
+    }
+    function rankBadge(i) {
+      if (i === 0) return `<div class="rank-badge rank-1">🥇</div>`;
+      if (i === 1) return `<div class="rank-badge rank-2">🥈</div>`;
+      if (i === 2) return `<div class="rank-badge rank-3">🥉</div>`;
+      return `<div class="rank-badge" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">${i + 1}</div>`;
+    }
+
+    function renderVideos(videos) {
+      if (videos.length === 0) {
+        sectionTitle.style.display = 'none';
+        videoGrid.style.display    = 'none';
+        stateBox.innerHTML  = '<div class="icon">📭</div><div>Este canal no tiene videos publicados aún.</div>';
+        stateBox.style.display = '';
+        return;
+      }
+
+      videoGrid.innerHTML = videos.map((v, i) => {
+        const thumb = v.thumbnail
+          ? `<img class="video-thumb" src="${v.thumbnail}" alt="" loading="lazy">`
+          : `<div class="thumb-placeholder">🎬</div>`;
+        const dur = v.duracion ? `<span class="dur-badge">${v.duracion}</span>` : '';
+
+        return `
+          <a class="video-card ${rankClass(i)}" href="${v.url}" target="_blank" rel="noopener">
+            ${rankBadge(i)}
+            <div class="thumb-wrap">${thumb}${dur}</div>
+            <div class="video-body">
+              <div class="video-title">${v.titulo}</div>
+              <div class="video-meta">
+                <span class="video-date">${fmtFecha(v.publicadoEn)}</span>
+                <span class="priv-badge ${privClass(v.privacidad)}">${privLabel(v.privacidad)}</span>
+                <span class="eng-badge ${engClass(v.engagement)}">${v.engagement}% eng</span>
+              </div>
+              <div class="video-stats">
+                <div class="vstat vstat-views">
+                  <span class="n">${fmt(v.vistas)}</span>
+                  <span class="lbl">👁 vistas</span>
+                </div>
+                <div class="vstat">
+                  <span class="n">${fmt(v.likes)}</span>
+                  <span class="lbl">👍 likes</span>
+                </div>
+                <div class="vstat">
+                  <span class="n">${fmt(v.comentarios)}</span>
+                  <span class="lbl">💬 comentarios</span>
+                </div>
+              </div>
+              <div class="vstat-extra">
+                <span class="vstat-small">📈 <span class="n">${fmt(v.vistasPorDia)}</span>/día</span>
+              </div>
+            </div>
+          </a>`;
+      }).join('');
+
+      sectionTitle.style.display = '';
+      videoGrid.style.display    = '';
+      stateBox.style.display     = 'none';
+    }
+
+    // ── Cargar estadísticas ───────────────────────────────────────────────────
+    async function cargarEstadisticas() {
+      const canal = selectCanal.value;
+      if (!canal) return;
+      btnCargar.disabled = true;
+      showLoading();
+      try {
+        const res  = await fetch(`/youtube/estadisticas/${encodeURIComponent(canal)}`);
+        const data = await res.json();
+        if (!res.ok) {
+          showState(`<div class="icon">⚠️</div><div>${data.error || 'Error al obtener estadísticas'}</div>`, true);
+          return;
+        }
+        renderChannelCard(data.canal);
+        renderResumen(data.resumen);
+        renderVideos(data.videos);
+      } catch (err) {
+        showState(`<div class="icon">⚠️</div><div>Error de red: ${err.message}</div>`, true);
+      } finally {
+        btnCargar.disabled = false;
+      }
+    }
+
+    btnCargar.addEventListener('click', cargarEstadisticas);
+    cargarCanales();
+  </script>
+</body>
+</html>

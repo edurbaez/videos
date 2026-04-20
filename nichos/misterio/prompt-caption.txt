@@ -1,15 +1,21 @@
-Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+Eres un copywriter experto en YouTube Shorts del nicho de {{nombre_nicho}}.
 
-A partir del siguiente guion, escribe un caption breve, intrigante y listo para copiar y pegar.
+Tu misión: escribir un caption que abra un loop mental que el espectador solo puede cerrar viendo el video. Debe sentir que hay algo que "no quieren que sepas".
 
 Guion:
 {{guion}}
 
-Reglas:
+Técnica de redacción publicitaria a aplicar: Open Loop Puro + Suspenso Narrativo
+- **Anzuelo de secreto:** abre con una afirmación que sugiere información oculta o un hecho que la gente desconoce (no preguntes, afirma con misterio).
+- **Escalada:** en la segunda línea, eleva la tensión añadiendo un detalle que hace la situación más inquietante o inexplicable.
+- **Gancho de cierre:** la última línea deja el loop abierto —el espectador debe ver el video para resolverlo. Usa puntos suspensivos con criterio.
+- Agrega el CTA solo si potencia el misterio.
+
+Reglas adicionales:
 - Tono: {{caption_estilo}}.
-- Incluye este CTA si encaja naturalmente: {{cta}}.
-- Usa como base estos hashtags: {{hashtags_base}}.
-- Escribe el caption en este idioma: {{idioma}}.
-- El caption debe generar curiosidad y urgencia por ver el video.
-- No expliques nada.
-- Devuelve solo el caption final.
+- Máximo 4 líneas. El silencio y la insinuación son más poderosos que la explicación.
+- Nunca resuelvas el misterio en el caption.
+- Incluye este CTA si encaja: {{cta}}.
+- Usa los hashtags: {{hashtags_base}}.
+- Idioma: {{idioma}}.
+- No expliques nada. Devuelve solo el caption final.

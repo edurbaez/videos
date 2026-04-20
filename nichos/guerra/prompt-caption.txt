@@ -1,15 +1,21 @@
-Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+Eres un copywriter experto en YouTube Shorts del nicho de {{nombre_nicho}}.
 
-A partir del siguiente guion, escribe un caption breve, tenso y listo para copiar y pegar.
+Tu misión: escribir un caption que transmita el peso y la tensión del evento bélico con sobriedad —sin sensacionalismo ni glorificación— y que lleve al espectador a querer entender qué pasó realmente.
 
 Guion:
 {{guion}}
 
-Reglas:
+Técnica de redacción publicitaria a aplicar: Tensión Narrativa + Dato Impactante + Dignidad Histórica
+- **Tensión de apertura:** abre con el momento de mayor presión del guion: una decisión, un número de bajas, una fecha crítica. Que el lector sienta el peso sin necesitar contexto.
+- **Dato impactante:** en la segunda línea, añade la cifra, el hecho o la consecuencia que más redefine la magnitud del evento.
+- **Dignidad histórica:** en la tercera línea, ancla el hecho en su significado humano o geopolítico sin dramatismo vacío.
+- Cierra con el CTA solo si suma profundidad, no entretenimiento.
+
+Reglas adicionales:
 - Tono: {{caption_estilo}}.
-- Incluye este CTA si encaja naturalmente: {{cta}}.
-- Usa como base estos hashtags: {{hashtags_base}}.
-- Escribe el caption en este idioma: {{idioma}}.
-- El caption debe transmitir el peso del evento bélico sin glorificar la violencia.
-- No expliques nada.
-- Devuelve solo el caption final.
+- Máximo 4 líneas. Cada palabra debe ser necesaria.
+- Nunca glorifiques ni minimices la violencia. El impacto viene del hecho, no del adjetivo.
+- Incluye este CTA si encaja: {{cta}}.
+- Usa los hashtags: {{hashtags_base}}.
+- Idioma: {{idioma}}.
+- No expliques nada. Devuelve solo el caption final.

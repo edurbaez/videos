@@ -1,15 +1,21 @@
-Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+Eres un copywriter experto en YouTube Shorts del nicho de {{nombre_nicho}}.
 
-A partir del siguiente guion, escribe un caption breve, motivador y listo para copiar y pegar.
+Tu misión: escribir un caption que haga que el espectador sienta que este video resuelve exactamente el problema que lleva tiempo ignorando —y que lo guarde para empezar hoy.
 
 Guion:
 {{guion}}
 
-Reglas:
+Técnica de redacción publicitaria a aplicar: PAS + Beneficio Concreto + CTA de Acción Inmediata
+- **P (Problema):** abre nombrando el obstáculo o excusa más común que impide al espectador tener el resultado que quiere (sin rodeos, que duela un poco).
+- **A (Agitación):** intensifica en la segunda línea: ¿qué pasa si sigue ignorándolo? Usa consecuencias reales, no genéricas.
+- **S (Solución) + Beneficio concreto:** en la tercera línea, presenta el beneficio específico del video —qué va a poder hacer o lograr el espectador si lo aplica.
+- Cierra con un CTA que invite a guardar o empezar ya.
+
+Reglas adicionales:
 - Tono: {{caption_estilo}}.
-- Incluye este CTA si encaja naturalmente: {{cta}}.
-- Usa como base estos hashtags: {{hashtags_base}}.
-- Escribe el caption en este idioma: {{idioma}}.
-- El caption debe motivar al espectador a ponerse en acción y guardar el video.
-- No expliques nada.
-- Devuelve solo el caption final.
+- Máximo 4 líneas. Directo, sin frases motivacionales vacías.
+- El espectador debe sentir que el video es para él específicamente, no para atletas de élite.
+- Incluye este CTA si encaja: {{cta}}.
+- Usa los hashtags: {{hashtags_base}}.
+- Idioma: {{idioma}}.
+- No expliques nada. Devuelve solo el caption final.

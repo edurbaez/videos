@@ -250,6 +250,121 @@ Rules:
   return { titulo: tituloShort, descripcion, tags };
 }
 
+// ── Estadísticas del canal ────────────────────────────────────────────────────
+
+// Convierte duración ISO 8601 (PT1M30S) a string legible "1:30"
+function parseDuracion(iso) {
+  if (!iso) return null;
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return null;
+  const h = parseInt(m[1] || '0');
+  const min = parseInt(m[2] || '0');
+  const s = parseInt(m[3] || '0');
+  const mm = h > 0 ? `${h}:${String(min).padStart(2, '0')}` : `${min}`;
+  return `${mm}:${String(s).padStart(2, '0')}`;
+}
+
+const DIAS_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+async function obtenerEstadisticasCanal(canal) {
+  const auth = await obtenerClienteAutenticado(canal);
+  const ytApi = google.youtube({ version: 'v3', auth });
+
+  // Info del canal
+  const chRes = await ytApi.channels.list({
+    part: 'snippet,statistics,contentDetails',
+    mine: true,
+  });
+  const ch        = chRes.data.items?.[0];
+  if (!ch) throw new Error('No se encontró el canal en YouTube.');
+  const uploadsId = ch.contentDetails.relatedPlaylists.uploads;
+
+  const totalVideos     = parseInt(ch.statistics.videoCount   || '0', 10);
+  const totalVistas     = parseInt(ch.statistics.viewCount    || '0', 10);
+  const canalInfo = {
+    id:                   ch.id,
+    titulo:               ch.snippet.title,
+    descripcion:          ch.snippet.description,
+    thumbnail:            ch.snippet.thumbnails?.default?.url || '',
+    suscriptores:         ch.statistics.subscriberCount || '0',
+    vistasTotal:          ch.statistics.viewCount        || '0',
+    videosTotal:          ch.statistics.videoCount       || '0',
+    pais:                 ch.snippet.country             || '',
+    creadoEn:             ch.snippet.publishedAt         || null,
+    promedioVistasPorVideo: totalVideos > 0 ? Math.round(totalVistas / totalVideos) : 0,
+  };
+
+  // Últimos 10 videos de la lista de subidos
+  const plRes = await ytApi.playlistItems.list({
+    part:       'snippet',
+    playlistId: uploadsId,
+    maxResults: 10,
+  });
+  const items    = plRes.data.items || [];
+  const videoIds = items.map(i => i.snippet.resourceId.videoId).join(',');
+
+  if (!videoIds) return { canal: canalInfo, videos: [], resumen: null };
+
+  // Estadísticas + duración + privacidad en un solo request
+  const vRes = await ytApi.videos.list({
+    part: 'snippet,statistics,contentDetails,status',
+    id:   videoIds,
+  });
+
+  const ahora = Date.now();
+  const videos = (vRes.data.items || [])
+    .map(v => {
+      const vistas      = parseInt(v.statistics.viewCount    || '0', 10);
+      const likes       = parseInt(v.statistics.likeCount    || '0', 10);
+      const comentarios = parseInt(v.statistics.commentCount || '0', 10);
+      const diasVivos   = Math.max(1, Math.floor((ahora - new Date(v.snippet.publishedAt)) / 86_400_000));
+      const engagement  = vistas > 0 ? parseFloat(((likes + comentarios) / vistas * 100).toFixed(2)) : 0;
+      const vistasPorDia = Math.round(vistas / diasVivos);
+
+      return {
+        id:           v.id,
+        titulo:       v.snippet.title,
+        thumbnail:    v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '',
+        publicadoEn:  v.snippet.publishedAt,
+        privacidad:   v.status?.privacyStatus || 'public',
+        duracion:     parseDuracion(v.contentDetails?.duration),
+        vistas,
+        likes,
+        comentarios,
+        engagement,
+        vistasPorDia,
+        url: `https://www.youtube.com/watch?v=${v.id}`,
+      };
+    })
+    .sort((a, b) => b.vistas - a.vistas);
+
+  // Mejor día para publicar: promedio de vistas por día de la semana
+  const vistasXDia = Array(7).fill(0);
+  const countXDia  = Array(7).fill(0);
+  videos.forEach(v => {
+    const dia = new Date(v.publicadoEn).getDay();
+    vistasXDia[dia] += v.vistas;
+    countXDia[dia]++;
+  });
+  let mejorDiaIdx = 0;
+  let mejorPromedio = -1;
+  vistasXDia.forEach((total, i) => {
+    const prom = countXDia[i] > 0 ? total / countXDia[i] : 0;
+    if (prom > mejorPromedio) { mejorPromedio = prom; mejorDiaIdx = i; }
+  });
+
+  const resumen = {
+    mejorDia:         countXDia[mejorDiaIdx] > 0 ? DIAS_ES[mejorDiaIdx] : null,
+    videoMasVisto:    videos[0]?.titulo || null,
+    promedioVistas:   videos.length > 0 ? Math.round(videos.reduce((s, v) => s + v.vistas, 0) / videos.length) : 0,
+    promedioEngagement: videos.length > 0
+      ? parseFloat((videos.reduce((s, v) => s + v.engagement, 0) / videos.length).toFixed(2))
+      : 0,
+  };
+
+  return { canal: canalInfo, videos, resumen };
+}
+
 module.exports = {
   obtenerUrlAuth,
   manejarCallback,
@@ -258,4 +373,5 @@ module.exports = {
   generarMetadatosYoutube,
   generarMetadatosShorts,
   subirVideo,
+  obtenerEstadisticasCanal,
 };

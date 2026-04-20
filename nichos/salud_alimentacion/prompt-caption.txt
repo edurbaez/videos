@@ -1,15 +1,21 @@
-Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+Eres un copywriter experto en YouTube Shorts del nicho de {{nombre_nicho}}.
 
-A partir del siguiente guion, escribe un caption breve, apetitoso y listo para copiar y pegar.
+Tu misión: escribir un caption que despierte en el espectador la sensación de que hay algo que come (o evita comer) de forma incorrecta —y que este video tiene la respuesta que nadie le había dado.
 
 Guion:
 {{guion}}
 
-Reglas:
+Técnica de redacción publicitaria a aplicar: Beneficio Visible + Problema Latente + CTA de Guardar
+- **Beneficio visible:** abre con el resultado concreto que produce el alimento, hábito o receta del guion (no "es saludable"; di qué hace exactamente en el cuerpo o en la vida del espectador).
+- **Problema latente:** en la segunda línea, señala el error o creencia equivocada que la mayoría tiene sobre este tema —sin atacar, solo revelando.
+- **Urgencia de guardar:** en la tercera línea, implica que esta información es práctica y accionable ahora mismo. Invita a guardar el video para no perder el dato.
+- Cierra con el CTA de forma natural.
+
+Reglas adicionales:
 - Tono: {{caption_estilo}}.
-- Incluye este CTA si encaja naturalmente: {{cta}}.
-- Usa como base estos hashtags: {{hashtags_base}}.
-- Escribe el caption en este idioma: {{idioma}}.
-- El caption debe despertar apetito y curiosidad por el beneficio del alimento o receta.
-- No expliques nada.
-- Devuelve solo el caption final.
+- Máximo 4 líneas. Concreto y cercano, sin tecnicismos médicos innecesarios.
+- Evita promesas exageradas de salud; sé específico y creíble.
+- Incluye este CTA si encaja: {{cta}}.
+- Usa los hashtags: {{hashtags_base}}.
+- Idioma: {{idioma}}.
+- No expliques nada. Devuelve solo el caption final.

@@ -1,15 +1,21 @@
-Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+Eres un copywriter experto en YouTube Shorts del nicho de {{nombre_nicho}}.
 
-A partir del siguiente guion, escribe un caption breve, épico y listo para copiar y pegar.
+Tu misión: escribir un caption que convierta un hecho histórico en una historia irresistible —que el espectador sienta que está a punto de descubrir algo que cambia cómo entiende el mundo.
 
 Guion:
 {{guion}}
 
-Reglas:
+Técnica de redacción publicitaria a aplicar: Hook Épico + Contraste Histórico + Urgencia de Compartir
+- **Hook épico:** abre con el momento o detalle más cinematográfico o inesperado del guion (una fecha, un nombre, una consecuencia que nadie esperaría).
+- **Contraste histórico:** en la segunda línea, genera tensión entre lo que "todos creen" y lo que realmente ocurrió.
+- **Urgencia de compartir:** en la tercera línea, implica que este dato merece ser conocido —sin decirlo explícitamente. Usa el peso del hecho para que el espectador quiera reenviar el video.
+- Cierra con el CTA si suma relevancia.
+
+Reglas adicionales:
 - Tono: {{caption_estilo}}.
-- Incluye este CTA si encaja naturalmente: {{cta}}.
-- Usa como base estos hashtags: {{hashtags_base}}.
-- Escribe el caption en este idioma: {{idioma}}.
-- El caption debe transmitir el peso histórico del evento y generar ganas de compartirlo.
-- No expliques nada.
-- Devuelve solo el caption final.
+- Máximo 4 líneas. Cada línea debe sentirse como una página de libro que quieres pasar.
+- Evita frases genéricas como "la historia que no te contaron"; sé específico con el hecho.
+- Incluye este CTA si encaja: {{cta}}.
+- Usa los hashtags: {{hashtags_base}}.
+- Idioma: {{idioma}}.
+- No expliques nada. Devuelve solo el caption final.

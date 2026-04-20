@@ -115,6 +115,24 @@ Módulo `middleware/seguridad.js` con 11 controles:
 - `guion.html`, `audio.html`, `imagenes.html` — servicios independientes
 - `videos_curso.html`, `audios-de-aleman.html` — servicios de curso
 
+### ✅ Estadísticas de canales YouTube (2026-04-19)
+- `GET /youtube/estadisticas/:canal` — nueva ruta en `server.js`
+- `obtenerEstadisticasCanal(canal)` en `services/youtube.js`
+  - Agrega `contentDetails` y `status` a la llamada `videos.list`
+  - Calcula `engagement` = (likes + comentarios) / vistas × 100
+  - Calcula `vistasPorDia` = vistas / días desde publicación
+  - Parsea duración ISO 8601 → formato legible (`M:SS`)
+  - Expone `privacidad` del video (public / unlisted / private)
+  - Canal: agrega `creadoEn` y `promedioVistasPorVideo`
+  - Deriva `mejorDiaSemana` (por promedio de vistas entre los 10 videos)
+  - Deriva engagement promedio y vistas promedio del conjunto
+- `public/estadisticas.html` — página completa:
+  - Selector de canal (solo canales autorizados habilitados)
+  - Tarjeta del canal con 4 métricas
+  - Strip de resumen: mejor día, promedio vistas, engagement, video más visto
+  - Grid de videos con medallas 🥇🥈🥉, badge de privacidad, badge de engagement, duración, vistas/día
+- `public/index.html` — nuevo card "Estadísticas 📊" en el grid de servicios
+
 ---
 
 ## Sesiones de trabajo
@@ -129,3 +147,4 @@ Módulo `middleware/seguridad.js` con 11 controles:
 | 6 | 2026-04-04 | Fase 8 (frontend selector de nicho) |
 | 7 | 2026-04-10 | Seguridad, YouTube, subtítulos, imagen de referencia, modelos imagen, curso de idiomas |
 | 8 | 2026-04-19 | Edición de guion antes de continuar, refactorización frontend |
+| 9 | 2026-04-19 | Estadísticas de canales YouTube (Data API v3) |

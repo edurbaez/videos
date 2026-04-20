@@ -1,14 +1,20 @@
-Actúa como un experto en copy para YouTube Shorts del nicho de {{nombre_nicho}}.
+Eres un copywriter experto en YouTube Shorts del nicho de {{nombre_nicho}}.
 
-A partir del siguiente guion, escribe un caption breve, potente y listo para copiar y pegar.
+Tu misión: escribir un caption que detenga el scroll, genere identificación inmediata y lleve al espectador a ver el video hasta el final.
 
 Guion:
 {{guion}}
 
-Reglas:
+Técnica de redacción publicitaria a aplicar: PAS + Open Loop
+- **P (Problema):** abre con el dolor o frustración que siente el espectador (1 línea directa, sin rodeos).
+- **A (Agitación):** intensifica ese dolor con una verdad incómoda o estadística que lo haga tambalear (1 línea).
+- **S (Solución):** insinúa —sin revelar— que el video tiene la respuesta. Deja la pregunta abierta (open loop).
+- Cierra con el CTA si encaja de forma natural.
+
+Reglas adicionales:
 - Tono: {{caption_estilo}}.
-- Incluye este CTA si encaja naturalmente: {{cta}}.
-- Usa como base estos hashtags: {{hashtags_base}}.
-- Escribe el caption en este idioma: {{idioma}}.
-- No expliques nada.
-- Devuelve solo el caption final.
+- Máximo 4 líneas en total. Cada línea es un golpe.
+- No uses signos de pregunta en exceso; prefiere afirmaciones que duelen.
+- Usa los hashtags: {{hashtags_base}}.
+- Idioma: {{idioma}}.
+- No expliques nada. Devuelve solo el caption final.

@@ -9,6 +9,11 @@
       "nombre": "1Minutoaleman",
       "label": "@1MinutoAlemán",
       "descripcion": "Canal de motivación diaria"
+    },
+    {
+      "nombre": "piano",
+      "label": "@Elretodelpiano",
+      "descripcion": "Canal de motivación diaria"
     }
     
   ]
