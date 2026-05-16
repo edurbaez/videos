@@ -32,10 +32,10 @@ function validarApiKey(req, res, next) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. RATE LIMITING
 // ─────────────────────────────────────────────────────────────────────────────
-// Límite global: 200 peticiones por IP cada 15 minutos.
+// Límite global: 1000 peticiones por IP cada 15 minutos.
 const limitarGlobal = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas peticiones. Intenta de nuevo en 15 minutos.' },
