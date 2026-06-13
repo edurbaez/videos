@@ -9,7 +9,7 @@
     "estilo": "cinematico",
     "escenario": "ninguno",
     "cantidadImagenes": 3,
-    "modeloImagen": "gpt-image-1",
+    "modeloImagen": "gpt-image-2",
     "apiImagen": "openai"
   },
   "guion": {

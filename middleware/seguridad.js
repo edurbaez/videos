@@ -100,10 +100,9 @@ function validarCantidad(cantidad, max = MAX_CANTIDAD) {
 // El modelo se interpola en URLs de Vertex AI y OpenAI.
 // Solo se permiten los modelos conocidos para evitar SSRF.
 const MODELOS_OPENAI = new Set([
+  'gpt-image-2',
   'gpt-image-1',
   'gpt-image-1-mini',
-  'dall-e-3',
-  'dall-e-2',
 ]);
 const MODELOS_GOOGLE = new Set([
   'imagen-3.0-generate-002',
