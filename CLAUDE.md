@@ -168,6 +168,16 @@ CORS_ORIGIN       (opcional — default http://localhost:PORT)
 
 ---
 
+## Notas de modelos / APIs externas
+
+⚠ **`gpt-image-1` se retira el 23 de octubre de 2026** (OpenAI). Afecta a `services/imagenes.js` (`MODELOS_IMG_OPENAI = ['gpt-image-1', 'gpt-image-1-mini']`, imagenes.js:718 en server.js) y a `/curso/generar`. Migrar a `gpt-image-1.5` antes de esa fecha o dejar `gpt-image-1-mini` (no afectado) como único modelo soportado.
+
+**Revisión periódica de APIs**: revisar cada 30 días el estado/pricing/deprecations de OpenAI (GPT-4o, gpt-image-1, gpt-image-1-mini, Whisper) y Google Cloud (Text-to-Speech Neural2, Imagen 3, Vertex AI).
+- Última revisión: 2026-09-14
+- Próxima revisión: 2026-10-14
+
+---
+
 ## Estado actual del sistema
 
 Implementación completa. Ver `PROGRESO.md` para el detalle de cada fase y sesión.

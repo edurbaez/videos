@@ -786,6 +786,18 @@
               <option value="public">Público</option>
             </select>
           </div>
+          <div class="yt-row" style="margin-top:10px;">
+            <span class="yt-row-label">Programar publicación</span>
+            <label class="yt-switch">
+              <input type="checkbox" id="v_ytProgramar" onchange="vToggleProgramar()">
+              <span class="yt-slider"></span>
+            </label>
+          </div>
+          <div id="v_ytProgramarPanel" style="display:none;margin-top:8px;">
+            <label for="v_ytFecha" style="margin-bottom:6px;">Fecha y hora de publicación</label>
+            <input type="datetime-local" id="v_ytFecha">
+            <p style="font-size:0.78rem;color:var(--muted);margin-top:4px">El video se sube como privado y YouTube lo publica automáticamente en esta fecha/hora (zona horaria local del navegador).</p>
+          </div>
         </div>
       </div>
 
@@ -1092,6 +1104,14 @@ function vToggleYoutube() {
   if (activo) vCargarCanalesYoutube();
 }
 
+function vToggleProgramar() {
+  const programar = document.getElementById('v_ytProgramar').checked;
+  document.getElementById('v_ytProgramarPanel').style.display = programar ? 'block' : 'none';
+  const privacidad = document.getElementById('v_ytPrivacidad');
+  privacidad.disabled = programar;
+  if (programar) privacidad.value = 'private';
+}
+
 async function ytCargarPanelCanales() {
   const contenedor = document.getElementById('yt_listaCanales');
   try {
@@ -1227,6 +1247,8 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
         subirYoutube:      document.getElementById('v_ytActivo').checked,
         canalYoutube:      document.getElementById('v_ytCanal').value,
         privacidadYoutube: document.getElementById('v_ytPrivacidad').value,
+        publicarYoutubeEn: (document.getElementById('v_ytProgramar').checked && document.getElementById('v_ytFecha').value)
+          ? new Date(document.getElementById('v_ytFecha').value).toISOString() : null,
       }),
     });
     if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || 'Error al iniciar.'); }

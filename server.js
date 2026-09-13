@@ -73,6 +73,20 @@ function cursoListarArchivos() {
   });
 }
 
+/** Divide un guion en N segmentos contiguos de oraciones, para generar una infografía por segmento. */
+function dividirGuionEnSegmentos(guion, n) {
+  const oraciones = guion.match(/[^.!?]+[.!?]*/g)?.map(s => s.trim()).filter(Boolean) || [guion];
+  if (n <= 1 || oraciones.length <= n) {
+    return n <= 1 ? [guion] : oraciones.concat(Array(n - oraciones.length).fill(oraciones[oraciones.length - 1]));
+  }
+  const porSegmento = Math.ceil(oraciones.length / n);
+  const segmentos = [];
+  for (let i = 0; i < n; i++) {
+    segmentos.push(oraciones.slice(i * porSegmento, (i + 1) * porSegmento).join(' ').trim());
+  }
+  return segmentos.filter(Boolean).length === n ? segmentos : segmentos.map(s => s || guion);
+}
+
 // Multer para subida de imagen de referencia
 const uploadRef = multer({
   storage: multer.diskStorage({
@@ -226,6 +240,12 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
   const subirYoutube = req.body.subirYoutube === true || req.body.subirYoutube === 'true';
   const privacidadYoutube = ['public', 'unlisted', 'private'].includes(req.body.privacidadYoutube)
     ? req.body.privacidadYoutube : 'private';
+  let publicarYoutubeEn = null;
+  try {
+    publicarYoutubeEn = seg.validarFechaProgramada(req.body.publicarYoutubeEn);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
   let canalYoutube = null;
   if (subirYoutube) {
     const canalesConf = yt.listarCanalesConfig();
@@ -363,6 +383,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
             tags:        meta.tags,
             canal:       canalYoutube,
             privacidad:  privacidadYoutube,
+            publicarEn:  publicarYoutubeEn,
           });
           emitirEvento(id, 'youtube_listo', { url: youtubeResult.url, videoId: youtubeResult.videoId });
           console.log(`[${ts()}] YouTube: publicado → ${youtubeResult.url}`);
@@ -725,6 +746,12 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
   const subirYoutube     = (req.body.subirYoutube === true || req.body.subirYoutube === 'true') && modo === 'video';
   const privacidadYoutube = ['public', 'unlisted', 'private'].includes(req.body.privacidadYoutube)
     ? req.body.privacidadYoutube : 'private';
+  let publicarYoutubeEn = null;
+  try {
+    publicarYoutubeEn = seg.validarFechaProgramada(req.body.publicarYoutubeEn);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
   let canalYoutube = null;
   if (subirYoutube) {
     const canalesConf = yt.listarCanalesConfig();
@@ -868,12 +895,15 @@ Script to revise:
         emit('progreso', { paso: 4, mensaje: `Generando ${cantidadImagenes} imagen(es) con ${apiImagen}...` });
         console.log(`[${ts()}] Curso: iniciando imágenes api=${apiImagen} modelo=${modeloImagen} cantidad=${cantidadImagenes}`);
 
-        const promptImagen = `Professional educational illustration for an online course video about: ${tema}. Language level ${nivel}. Clean, informative, no text overlays, suitable for e-learning.`;
+        const segmentosGuion = dividirGuionEnSegmentos(guion, cantidadImagenes);
+        const promptsImagen = segmentosGuion.map((segmento) =>
+          `Infographic-style illustration for an online course video about "${tema}", visually representing this specific idea from the script: "${segmento}". Language level ${nivel}. Use diagrams, icons, charts, or visual metaphors to convey the concept. Clean and minimal, no readable text or letters, suitable for e-learning.`
+        );
 
         let rutasOrdenadas;
         try {
           rutasOrdenadas = await generarImagenesDirectas(
-            promptImagen, cantidadImagenes, id, modeloImagen, apiImagen,
+            promptsImagen, cantidadImagenes, id, modeloImagen, apiImagen,
             async (n, _ruta) => {
               emit('imagen_lista', { n, total: cantidadImagenes });
               console.log(`[${ts()}] Curso: imagen ${n}/${cantidadImagenes} lista.`);
@@ -920,6 +950,7 @@ Script to revise:
             tags:        meta.tags,
             canal:       canalYoutube,
             privacidad:  privacidadYoutube,
+            publicarEn:  publicarYoutubeEn,
           });
           emit('youtube_listo', { url: youtubeResult.url, videoId: youtubeResult.videoId });
           console.log(`[${ts()}] YouTube: video publicado → ${youtubeResult.url}`);

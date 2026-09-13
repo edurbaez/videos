@@ -223,9 +223,11 @@ async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-00
 async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCadaImagen, refImagePath = null, quality = 'medium') {
   const ts = () => new Date().toTimeString().slice(0, 8);
   const rutas = [];
+  const prompts = Array.isArray(prompt) ? prompt : null;
 
   for (let i = 0; i < cantidad; i++) {
     const n = i + 1;
+    const promptActual = prompts ? (prompts[i] || prompts[prompts.length - 1]) : prompt;
     const ruta = rutaImagen(id, n);
     const urlPublica = `/output/imagenes/imagen-${id}-${n}.png`;
 
@@ -237,14 +239,14 @@ async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCada
       try {
         let buffer;
         if (api === 'google') {
-          buffer = await llamarGoogleImagen(prompt, modelo);
+          buffer = await llamarGoogleImagen(promptActual, modelo);
         } else if (refImagePath) {
-          buffer = await llamarOpenAIImagenEdits(prompt, refImagePath, modelo, quality);
+          buffer = await llamarOpenAIImagenEdits(promptActual, refImagePath, modelo, quality);
         } else {
-          buffer = await llamarOpenAIImagen(prompt, modelo, quality);
+          buffer = await llamarOpenAIImagen(promptActual, modelo, quality);
         }
         fs.writeFileSync(ruta, buffer);
-        galeria.push({ id, numero: n, ruta, urlPublica, prompt, fecha: new Date().toISOString() });
+        galeria.push({ id, numero: n, ruta, urlPublica, prompt: promptActual, fecha: new Date().toISOString() });
         guardada = true;
         break;
       } catch (err) {
@@ -280,9 +282,13 @@ function crearPlaceholder(ruta) {
 }
 
 /**
- * Genera todas las imágenes del video en paralelo.
- * Para cada imagen: genera prompt → llama Gemini → guarda PNG.
- * Si Gemini falla, reintenta una vez. Si falla de nuevo, usa placeholder negro.
+ * Genera todas las imágenes del video de forma secuencial.
+ * Para cada imagen: genera prompt (o usa el del storyboard) → llama a la API de imágenes → guarda PNG.
+ * Si la API falla, reintenta una vez. Si falla de nuevo, usa placeholder negro.
+ *
+ * Consistencia de personaje: si no se pasa `refImagePath` (referencia manual del usuario)
+ * y la API es OpenAI, la primera imagen generada con éxito se fija como referencia
+ * automática (`/v1/images/edits`) para las escenas siguientes del mismo video.
  *
  * @param {string} guion    - Texto del guion mejorado
  * @param {number} cantidad - Número de imágenes a generar
@@ -308,17 +314,21 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
   }
 
   const rutas = [];
+  // Ancla de consistencia: si no hay refImagePath del usuario, la primera imagen
+  // generada se usa como referencia (edits) para las siguientes escenas del mismo video.
+  let refAuto = null;
 
   for (let i = 0; i < cantidad; i++) {
     const n = i + 1;
     const ruta = rutaImagen(id, n);
     const urlPublica = `/output/imagenes/imagen-${id}-${n}.png`;
+    const refActual = refImagePath || refAuto;
 
     let promptVisual;
     if (storyboardPrompts) {
       promptVisual = storyboardPrompts[n - 1];
       if (onPrompt) onPrompt(n, promptVisual);
-      console.log(`[${ts()}] Imagen ${n}/${cantidad}: usando prompt de storyboard → llamando ${api}/${modelo}...`);
+      console.log(`[${ts()}] Imagen ${n}/${cantidad}: usando prompt de storyboard → llamando ${api}/${modelo}${refActual ? ' (con referencia para consistencia)' : ''}...`);
     } else {
       console.log(`[${ts()}] Imagen ${n}/${cantidad}: generando prompt visual...`);
       try {
@@ -347,8 +357,8 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
         let buffer;
         if (api === 'google') {
           buffer = await llamarGoogleImagen(promptVisual, modelo);
-        } else if (refImagePath) {
-          buffer = await llamarOpenAIImagenEdits(promptVisual, refImagePath, modelo, quality);
+        } else if (refActual) {
+          buffer = await llamarOpenAIImagenEdits(promptVisual, refActual, modelo, quality);
         } else {
           buffer = await llamarOpenAIImagen(promptVisual, modelo, quality);
         }
@@ -356,6 +366,9 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
         console.log(`[${ts()}] Imagen ${n}/${cantidad}: guardada (intento ${intento})`);
         galeria.push({ id, numero: n, ruta, urlPublica, prompt: promptVisual, fecha: new Date().toISOString() });
         guardada = true;
+        // Fija la primera imagen generada como referencia automática para las siguientes,
+        // solo si el usuario no aportó su propia referencia y la API la soporta.
+        if (!refImagePath && !refAuto && api !== 'google') refAuto = ruta;
         break;
       } catch (err) {
         ultimoError = err.message;

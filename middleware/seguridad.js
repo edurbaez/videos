@@ -95,6 +95,22 @@ function validarCantidad(cantidad, max = MAX_CANTIDAD) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 5b. VALIDACIÓN DE FECHA DE PUBLICACIÓN PROGRAMADA (YouTube)
+// ─────────────────────────────────────────────────────────────────────────────
+// YouTube exige que publishAt sea una fecha futura (al menos ~15 min de margen).
+function validarFechaProgramada(valor) {
+  if (!valor) return null;
+  const fecha = new Date(valor);
+  if (isNaN(fecha.getTime())) {
+    throw new Error('Fecha de publicación programada inválida.');
+  }
+  if (fecha.getTime() < Date.now() + 15 * 60 * 1000) {
+    throw new Error('La fecha de publicación programada debe ser al menos 15 minutos en el futuro.');
+  }
+  return fecha.toISOString();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 6. WHITELIST DE MODELOS (SSRF anti-injection en URLs de API)
 // ─────────────────────────────────────────────────────────────────────────────
 // El modelo se interpola en URLs de Vertex AI y OpenAI.
@@ -171,6 +187,7 @@ module.exports = {
   validarRefImagePath,
   sanitizarTema,
   validarCantidad,
+  validarFechaProgramada,
   validarModelo,
   verificarMagicBytes,
   MAX_SSE_CLIENTES,

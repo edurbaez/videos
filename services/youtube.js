@@ -172,9 +172,17 @@ Rules:
 
 // ── Subida a YouTube ──────────────────────────────────────────────────────────
 
-async function subirVideo({ rutaVideo, titulo, descripcion, tags, canal, privacidad = 'private' }) {
+async function subirVideo({ rutaVideo, titulo, descripcion, tags, canal, privacidad = 'private', publicarEn = null }) {
   const auth    = await obtenerClienteAutenticado(canal);
   const youtube = google.youtube({ version: 'v3', auth });
+
+  // Publicación programada: YouTube exige que el video quede en 'private' hasta publishAt,
+  // momento en el que lo publica automáticamente con la privacidad definitiva.
+  const status = {
+    privacyStatus:           publicarEn ? 'private' : privacidad,
+    selfDeclaredMadeForKids: false,
+  };
+  if (publicarEn) status.publishAt = publicarEn;
 
   const resp = await youtube.videos.insert({
     part: 'snippet,status',
@@ -185,10 +193,7 @@ async function subirVideo({ rutaVideo, titulo, descripcion, tags, canal, privaci
         tags,
         categoryId:  '27', // Education
       },
-      status: {
-        privacyStatus:             privacidad,
-        selfDeclaredMadeForKids:   false,
-      },
+      status,
     },
     media: {
       body: fs.createReadStream(rutaVideo),

@@ -576,6 +576,18 @@
                 <option value="public">Público</option>
               </select>
             </div>
+            <div class="yt-row" style="margin-top:10px;">
+              <span class="yt-row-label">Programar publicación</span>
+              <label class="yt-switch">
+                <input type="checkbox" id="yt-programar" onchange="toggleProgramarYoutube()">
+                <span class="yt-slider"></span>
+              </label>
+            </div>
+            <div id="yt-programar-panel" style="display:none;margin-top:8px;">
+              <label for="yt-fecha" style="margin-bottom:6px;">Fecha y hora de publicación</label>
+              <input type="datetime-local" id="yt-fecha">
+              <p style="font-size:0.78rem;color:var(--muted);margin-top:4px">El video se sube como privado y YouTube lo publica automáticamente en esta fecha/hora (zona horaria local del navegador).</p>
+            </div>
           </div>
         </div>
       </div>
@@ -833,6 +845,8 @@ Script to revise:
           subirYoutube:      document.getElementById('yt-activo').checked && modoSeleccionado === 'video',
           canalYoutube:      document.getElementById('yt-canal').value,
           privacidadYoutube: document.getElementById('yt-privacidad').value,
+          publicarYoutubeEn: (document.getElementById('yt-programar').checked && document.getElementById('yt-fecha').value)
+            ? new Date(document.getElementById('yt-fecha').value).toISOString() : null,
         }),
       });
 
@@ -988,6 +1002,14 @@ Script to revise:
     const activo = document.getElementById('yt-activo').checked;
     document.getElementById('yt-panel').style.display = activo ? 'block' : 'none';
     if (activo) cargarCanalesYoutube();
+  }
+
+  function toggleProgramarYoutube() {
+    const programar = document.getElementById('yt-programar').checked;
+    document.getElementById('yt-programar-panel').style.display = programar ? 'block' : 'none';
+    const privacidad = document.getElementById('yt-privacidad');
+    privacidad.disabled = programar;
+    if (programar) privacidad.value = 'private';
   }
 
   // ── Lista de archivos ────────────────────────────────────────────────────
