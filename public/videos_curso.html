@@ -342,6 +342,38 @@
     .prompt-editor { display: none; }
     .prompt-editor.visible { display: block; }
 
+    /* ── Selector de reglas gramaticales ────────────────────────────────── */
+    .gram-panel { display: none; margin-top: 10px; }
+    .gram-panel.visible { display: block; }
+    .gram-levels { display: flex; gap: 6px; margin-bottom: 10px; }
+    .gram-level-btn {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color .2s, border-color .2s, background .2s;
+    }
+    .gram-level-btn:hover { color: var(--text); }
+    .gram-level-btn.active { border-color: var(--accent); color: var(--accent2); background: rgba(99,102,241,0.12); }
+    .gram-list {
+      max-height: 260px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface2);
+    }
+    .gram-item { padding: 9px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s; }
+    .gram-item:last-child { border-bottom: none; }
+    .gram-item:hover { background: rgba(99,102,241,0.10); }
+    .gram-item-title { font-size: 0.85rem; color: var(--text); font-weight: 600; }
+    .gram-item-sub { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
     .prompt-editor textarea {
       font-family: 'Cascadia Code', 'Fira Code', monospace;
       font-size: 0.82rem;
@@ -479,6 +511,14 @@
     <div class="field">
       <label for="tema">Tema de la lección</label>
       <textarea id="tema" rows="3" placeholder="Ej: Die Verwendung des Dativs im Deutschen, How to use React hooks, Las fases del sueño..."></textarea>
+      <button type="button" class="prompt-toggle" id="gram-toggle" onclick="toggleGramPanel()" style="margin-top:8px;">
+        <span>📖</span> Elegir regla gramatical del alemán (por nivel)
+        <span class="pt-arrow">▶</span>
+      </button>
+      <div class="gram-panel" id="gram-panel">
+        <div class="gram-levels" id="gram-levels"></div>
+        <div class="gram-list" id="gram-list"></div>
+      </div>
     </div>
 
     <div class="field">
@@ -690,6 +730,181 @@ Rules:
 
 Script to revise:
 {guion}`;
+
+  // ── Reglas gramaticales del alemán por nivel CEFR (extraídas de ejercicios aleman/grammar-data-*.js) ──
+  const GRAMMAR_RULES = {
+    A1: [
+      ['Artículos definidos', 'der, die, das'],
+      ['Pronombres personales', 'ich, du, er/sie/es…'],
+      ['Verbos sein y haben', 'ser/estar y tener en presente'],
+      ['Presente verbos regulares', 'terminaciones -e, -st, -t, -en, -t, -en'],
+      ['Negación: nicht y kein', 'cuándo usar cada uno'],
+      ['Acusativo básico', 'cambio del artículo masculino (der → den)'],
+      ['W-Fragen', 'palabras interrogativas'],
+      ['Orden de palabras', 'el verbo siempre en posición 2'],
+      ['Plurales', 'las 5 formas más frecuentes'],
+      ['Artículo indefinido y su negación', 'ein/eine/ein — kein/keine/kein'],
+      ['Verben mit Vokalwechsel', 'cambio vocálico en presente, du/er'],
+      ['Possessivartikel', 'mein, dein, sein, ihr, unser, euer, ihr/Ihr'],
+      ['Artikel interrogativ und demonstrativ', 'welcher? — dieser!'],
+      ['Personalpronomen: Akkusativ und Dativ', 'mich, dir, ihn, ihr...'],
+      ['Temporale Präpositionen', 'im, am, um, von...bis, nach, vor'],
+      ['Hauptsätze verbinden: Position 0', 'und, aber, oder, denn'],
+      ['Komposita', 'Kinderarzt oder Arztkinder?'],
+      ['Zusammengesetzte Verben', 'verbos formados con sustantivo/adjetivo + verbo'],
+      ['Genusregeln', 'patrones para adivinar der/die/das'],
+      ['Verbos separables', 'prefijo al final en frase principal'],
+      ['Imperativo', 'formas du / ihr / Sie'],
+    ],
+    A2: [
+      ['Verbos modales', 'können, müssen, wollen, sollen, dürfen, mögen'],
+      ['Pretérito perfecto (Perfekt)', 'haben/sein + Partizip II'],
+      ['Dativo', 'artículos y pronombres en dativo'],
+      ['Preposiciones + Acusativo', 'durch, für, gegen, ohne, um'],
+      ['Preposiciones + Dativo', 'aus, bei, mit, nach, seit, von, zu, gegenüber'],
+      ['Wechselpräpositionen', 'Akk. (¿adónde?) vs. Dat. (¿dónde?)'],
+      ['Comparativo y superlativo', 'schneller / am schnellsten'],
+      ['Verbos reflexivos', 'sich waschen, sich freuen…'],
+      ['Zwei feste Positionen im Satz', 'verbo conjugado + segunda parte al final'],
+      ['Verben mit Akkusativ und Dativ', 'geben, schenken, zeigen, schicken — doble objeto'],
+      ['Verben mit Dativ', 'helfen, danken, gefallen, gehören...'],
+      ['Frage nach Personen und Sachen', 'wer/wen/wem vs. was'],
+      ['Präteritum: sein und haben', 'war, hatte...'],
+      ['Präteritum: Modalverben', 'musste, konnte, wollte...'],
+      ['Zeitgebrauch', '¿Präteritum o Perfekt?'],
+      ['Lokale Präpositionen: Wohin?', 'in, an, auf, nach, zu + movimiento'],
+      ['Lokale Präpositionen: Wo?', 'in, an, auf, bei + Dativ'],
+      ['Lokale Präpositionen: Woher?', 'aus, von'],
+      ['Hauptsätze verbinden: Position 1', 'deshalb, sonst, dann, danach'],
+      ['Nebensätze mit weil, wenn und dass', 'el verbo va al final'],
+      ['Partikeln und Wortbildung', 'doch, mal, ja... + -chen, -lein, -er, -in, -ung'],
+    ],
+    B1: [
+      ['Präteritum', 'pasado narrativo escrito'],
+      ['Konjunktiv II', 'hipótesis y cortesía'],
+      ['Oraciones de relativo', 'pronombres relativos + verbo al final'],
+      ['Genitivo', 'posesión y complementos nominales'],
+      ['Declinación de adjetivos', 'después de def. / indef. / sin artículo'],
+      ['Conectores subordinantes', 'weil, dass, obwohl, wenn, als, bevor, nachdem'],
+      ['Verbos con preposición fija', 'warten auf, denken an, sprechen über…'],
+      ['Infinitivo con "zu"', 'versuchen zu, aufhören zu…'],
+      ['Pasiva básica', 'werden + Partizip II'],
+      ['Futuro', 'werden + Infinitivo / Präsens + Zeitangabe'],
+      ['Plusquamperfekt', 'el pasado del pasado'],
+      ['Wenn vs. als (repaso ampliado)', 'condición/repetición vs. momento único pasado'],
+      ['Preguntas indirectas', 'ob / W-Wort + verbo al final'],
+      ['Infinitivo sin "zu"', 'modales, lassen, sehen, hören, gehen+Inf.'],
+      ['Relativsätze mit Präposition', 'der Mann, mit dem ich spreche…'],
+      ['Vergleichssätze: je...desto', 'cuanto más… (más/menos)'],
+      ['n-Deklination', 'sustantivos masculinos débiles: der Junge, den Jungen…'],
+      ['Adjektive als Nomen', 'der/die Jugendliche, das Beste, etwas Neues…'],
+      ['Präpositionaladverbien: da- und wo-', 'darauf, damit, davon… / worauf, womit, wovon…'],
+      ['Präpositionen mit Genitiv', 'während, wegen, trotz, innerhalb, außerhalb'],
+      ['Temporale Präpositionen (Wiederholung und Erweiterung)', 'seit, vor, in, ab, bis + Dativ'],
+      ['Funktionen von werden', 'verbo pleno, futuro y pasiva'],
+      ['Trennbare vs. untrennbare Verben', 'prefijos separables e inseparables'],
+      ['Reflexivpronomen: Erweiterung', 'reflexivos con preposición fija y "einander"'],
+      ['Negationswörter', 'nicht mehr, noch nicht, noch nie, nie mehr'],
+      ['Lokale Adverbien: Position und Direktion', 'hier/dort/da vs. hierhin/dorthin/dahin'],
+      ['Positions- und Direktionsverben', 'stehen/stellen, sitzen/setzen, liegen/legen, hängen'],
+      ['Das Verb lassen', 'causativo básico: mandar hacer / dejar hacer'],
+      ['Finalsätze: um...zu / damit (B1)', 'para / para que — versión básica'],
+      ['Doppelkonnektoren (B1)', 'entweder…oder, weder…noch, sowohl…als auch'],
+      ['Partizip I als Adjektiv (B1)', 'acción en curso — versión básica'],
+    ],
+    B2: [
+      ['Konjunktiv I', 'discurso indirecto'],
+      ['Konjunktiv II pasado', 'hipótesis irreales en el pasado'],
+      ['Comparaciones y consecuencias irreales', 'als ob, als, sonst + Konjunktiv II'],
+      ['Pasiva con agente', 'von (agente) / durch (medio o causa)'],
+      ['Pasiva con verbos modales', 'Modalverb + Partizip II + werden'],
+      ['Passivsätze ohne Subjekt', 'pasiva impersonal — Hier wird gelacht!'],
+      ['Partizip I como adjetivo', 'acción en curso o simultánea'],
+      ['Partizip II como adjetivo', 'acción completada / resultado'],
+      ['Futur II', 'suposición sobre el pasado — Er wird den Zug verpasst haben'],
+      ['Finalidad y contraste con infinitivo: um…zu / damit / ohne…zu / (an)statt…zu', 'para que / sin / en vez de'],
+      ['Concesión y adversación', 'obwohl, trotzdem, dennoch, zwar…aber, wohingegen'],
+      ['Konsekutive Nebensätze', 'sodass, weshalb, dermaßen…, dass'],
+      ['Relativsätze im Genitiv', 'dessen, deren'],
+      ['Relativpronomen mit was und wo(r)-', 'etwas, was… / nichts, worüber…'],
+      ['Conectores de dos partes', 'sowohl…als auch, weder…noch…'],
+      ['Nominalizaciones', 'sustantivación de verbos y adjetivos'],
+      ['Partículas modales', 'doch, mal, ja, eigentlich, eben, halt'],
+    ],
+    C1: [
+      ['lassen + sich', 'posibilidad pasiva activa'],
+      ['sein + zu + Infinitivo', 'obligación o posibilidad pasiva'],
+      ['Gerundivum', 'zu + Partizip I con valor pasivo'],
+      ['Atributo participial extendido', 'das von X beschlossene Gesetz'],
+      ['Irrealis del pasado con modales', 'hätte … können/müssen/sollen'],
+      ['Strukturen mit Ersatzinfinitiv', 'hat sehen / hat lassen / hat können'],
+      ['Partículas de evidencialidad', 'soll, will, dürfte — fuente de información'],
+      ['Wiedergabe von Aufforderungen und Gerüchten', 'sollen para órdenes · will + Perfekt Konj. I para autoafirmaciones dudosas'],
+      ['Formación de palabras: compuestos', 'Komposita — cómo interpretar la cadena'],
+      ['Trennbare und untrennbare Verben', 'mitkommen, ankommen, bekommen, entkommen — el prefijo cambia el sentido'],
+      ['Compuestos con irgend-', 'irgendjemand, irgendetwas, irgendwo, irgendwann, irgendwie, irgendein'],
+      ['Kausale Nebensätze mit da und wobei', 'da (causa conocida) vs. wobei (inciso causal-concesivo)'],
+      ['Modale Nebensätze mit indem', 'indem, dadurch dass, wodurch — el medio o método'],
+      ['Colocaciones verbonominales', 'Funktionsverbgefüge'],
+      ['Cohesión textual', 'referencia anafórica, elipsis, pronombres adverbiales'],
+      ['Inversión estilística', 'Kaum…als, Erst wenn, inicio con adverbial'],
+      ['Es como placeholder / sujeto formal', 'cuándo "es" es puramente gramatical y no se puede traducir ni omitir'],
+    ],
+    C2: [
+      ['Registro y variación estilística', 'formal / coloquial / científico / burocrático'],
+      ['Fraseología e idiomatismos', 'expresiones fijas, opacidad semántica'],
+      ['Figuras retóricas', 'Ironie, Euphemismus, Litotes, Hyperbel'],
+      ['Ambigüedad pragmática', 'implicatura, presuposición, sobreentendido'],
+      ['Convenciones del texto científico', 'pasiva impersonal, nominalizaciones, hedging'],
+      ['Arcaísmos y registro literario', 'ward, sei, möge — uso estilístico'],
+      ['Variantes dialectales', 'rasgos bávaros, suizos, austriacos, Plattdeutsch'],
+      ['Metaidioma y fórmulas discursivas', 'relativizar, distanciarse, estructurar'],
+      ['Modalidad compleja', 'müsste eigentlich, dürfte wohl, hätte können'],
+      ['Características de tipos de texto', 'Essay, Gutachten, Leserbrief, Protokoll'],
+    ],
+  };
+  let gramNivelActual = 'A1';
+
+  function toggleGramPanel() {
+    const btn = document.getElementById('gram-toggle');
+    const panel = document.getElementById('gram-panel');
+    const abierto = panel.classList.toggle('visible');
+    btn.classList.toggle('open', abierto);
+    if (abierto && !panel.dataset.init) {
+      panel.dataset.init = '1';
+      renderGramLevels();
+      renderGramList(gramNivelActual);
+    }
+  }
+
+  function renderGramLevels() {
+    const cont = document.getElementById('gram-levels');
+    cont.innerHTML = Object.keys(GRAMMAR_RULES).map(niv =>
+      `<button type="button" class="gram-level-btn${niv === gramNivelActual ? ' active' : ''}" onclick="seleccionarGramNivel('${niv}')">${niv}</button>`
+    ).join('');
+  }
+
+  function seleccionarGramNivel(niv) {
+    gramNivelActual = niv;
+    renderGramLevels();
+    renderGramList(niv);
+  }
+
+  function renderGramList(niv) {
+    const cont = document.getElementById('gram-list');
+    cont.innerHTML = GRAMMAR_RULES[niv].map((r, i) =>
+      `<div class="gram-item" onclick="insertarGramRule('${niv}', ${i})">
+         <div class="gram-item-title">${r[0]}</div>
+         <div class="gram-item-sub">${r[1]}</div>
+       </div>`
+    ).join('');
+  }
+
+  function insertarGramRule(niv, i) {
+    const regla = GRAMMAR_RULES[niv][i];
+    document.getElementById('tema').value = `${regla[0]} (${regla[1]})`;
+    document.getElementById('nivel').value = niv;
+  }
 
   const LANG_NAMES = {
     de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
