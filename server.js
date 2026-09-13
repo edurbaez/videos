@@ -900,7 +900,7 @@ Script to revise:
 
         const segmentosGuion = dividirGuionEnSegmentos(guion, cantidadImagenes);
         const promptsImagen = segmentosGuion.map((segmento) =>
-          `Infographic-style illustration for an online course video about "${tema}", visually representing this specific idea from the script: "${segmento}". Language level ${nivel}. Use diagrams, icons, charts, or visual metaphors to convey the concept. Clean and minimal — strongly prefer NO readable text or letters at all. If any text, labels, captions, or signage absolutely must appear in the image, it must be written entirely in ${langName}, never in English or any other language, regardless of the language of this prompt. Suitable for e-learning.`
+          `Professional educational infographic for an online course video about "${tema}", clearly explaining this specific idea from the script: "${segmento}". Language level ${nivel}. Rich in information: include labeled diagrams, icons with short captions, charts, numbered steps, or visual metaphors that make the concept easy to understand at a glance. All text, labels, captions, and signage must be short, legible, and written entirely in ${langName}, never in English or any other language, regardless of the language of this prompt. Clean modern layout, high contrast, well-organized composition. Suitable for e-learning.`
         );
 
         let rutasOrdenadas;
@@ -911,7 +911,7 @@ Script to revise:
               emit('imagen_lista', { n, total: cantidadImagenes });
               console.log(`[${ts()}] Curso: imagen ${n}/${cantidadImagenes} lista.`);
             },
-            null, 'medium'
+            null, 'high'
           );
         } catch (errImg) {
           throw new Error(`Error en imágenes: ${errImg.message}`);
