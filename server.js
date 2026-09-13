@@ -790,7 +790,7 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
       const palabrasLine = palabras
         ? `\n⚠ PRIORITY REQUIREMENT — You MUST use ALL of the following words or phrases at least once in the script. This is mandatory, not optional:\n${palabras}\nBuild the script around these words whenever possible.\n`
         : '';
-      const promptDefault = `You are a professional online course instructor. Write a spoken script for a short educational video about the topic below.\n\nRules:\n- The script must be entirely in ${langName}.\n- Language level: ${nivel} — adjust vocabulary, sentence complexity, and grammar accordingly.\n- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.\n- Target length: 150–220 words (approximately 1–2 minutes when spoken).\n- Write ONLY the spoken text, nothing else.\n${palabrasLine}\nTopic: ${tema}`;
+      const promptDefault = `You are a professional online course instructor. Write a spoken script for a short educational video about the topic below.\n\n⚠ MANDATORY LANGUAGE REQUIREMENT: The ENTIRE output must be written 100% in ${langName}, with zero exceptions. This applies regardless of the language used in these instructions or in the topic below — translate the topic into ${langName} if needed. Do NOT mix in English or any other language, not even single words, names of concepts, or transition phrases.\n\nRules:\n- The script must be entirely in ${langName} (see requirement above).\n- Language level: ${nivel} — adjust vocabulary, sentence complexity, and grammar accordingly.\n- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.\n- Target length: 150–220 words (approximately 1–2 minutes when spoken).\n- Write ONLY the spoken text, nothing else, entirely in ${langName}.\n${palabrasLine}\nTopic: ${tema}`;
       const promptGuion = promptPersonalizado || promptDefault;
 
       const respGuion = await require('axios').post(
@@ -818,21 +818,24 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
 
       const HUMANIZACION_DEFAULT = `You are a voice-over script editor specialized in text-to-speech optimization. Revise the following script to make it sound more natural and fluid when read aloud.
 
+⚠ MANDATORY LANGUAGE REQUIREMENT: The revised script must remain 100% in {idioma_nombre}, with zero exceptions, regardless of the language of these instructions. Do NOT translate, mix in, or switch to any other language.
+
 Rules:
-- Keep the exact same language ({idioma_code}), topic, and language level as the original.
+- Keep the exact same language ({idioma_nombre}), topic, and language level as the original.
 - Replace formal or rigid sentence structures with natural spoken patterns.
 - Add smooth transitions and connective phrases between ideas.
 - Vary sentence length to create a natural spoken rhythm.
 - Avoid lists, colons, semicolons, academic phrasing, and abrupt topic shifts.
 - Do NOT add new content, change the meaning, or alter the target language.
-- Output ONLY the revised script text, nothing else.
+- Output ONLY the revised script text, nothing else, entirely in {idioma_nombre}.
 
 Script to revise:
 {guion}`;
 
       const promptHumanizacionFinal = (promptHumanizacion || HUMANIZACION_DEFAULT)
         .replace(/\{guion\}/g, guionBorrador)
-        .replace(/\{idioma_code\}/g, idioma);
+        .replace(/\{idioma_code\}/g, idioma)
+        .replace(/\{idioma_nombre\}/g, langName);
 
       const respHuman = await require('axios').post(
         'https://api.openai.com/v1/chat/completions',
@@ -897,7 +900,7 @@ Script to revise:
 
         const segmentosGuion = dividirGuionEnSegmentos(guion, cantidadImagenes);
         const promptsImagen = segmentosGuion.map((segmento) =>
-          `Infographic-style illustration for an online course video about "${tema}", visually representing this specific idea from the script: "${segmento}". Language level ${nivel}. Use diagrams, icons, charts, or visual metaphors to convey the concept. Clean and minimal, no readable text or letters, suitable for e-learning.`
+          `Infographic-style illustration for an online course video about "${tema}", visually representing this specific idea from the script: "${segmento}". Language level ${nivel}. Use diagrams, icons, charts, or visual metaphors to convey the concept. Clean and minimal — strongly prefer NO readable text or letters at all. If any text, labels, captions, or signage absolutely must appear in the image, it must be written entirely in ${langName}, never in English or any other language, regardless of the language of this prompt. Suitable for e-learning.`
         );
 
         let rutasOrdenadas;
