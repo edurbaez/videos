@@ -14,7 +14,7 @@ const { listarNichos, cargarNicho } = require('./services/nichos');
 const { generarGuion } = require('./services/guion');
 const { generarCaption } = require('./services/caption');
 const { generarAudio } = require('./services/audio');
-const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, obtenerGaleria } = require('./services/imagenes');
+const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria } = require('./services/imagenes');
 const { generarVideo } = require('./services/video');
 const { generarSubtitulos } = require('./services/subtitulos');
 const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = require('./services/telegram');
@@ -895,12 +895,20 @@ Script to revise:
       let rutaVideoCurso = null;
       if (modo === 'video') {
         // — Imágenes —
+        emit('progreso', { paso: 4, mensaje: `Analizando contenido de ${cantidadImagenes} infografía(s)...` });
+        console.log(`[${ts()}] Curso: analizando esquemas de infografía...`);
+
+        const segmentosGuion = dividirGuionEnSegmentos(guion, cantidadImagenes);
+        const esquemas = await Promise.all(
+          segmentosGuion.map((segmento) => generarEsquemaInfografia(segmento, tema, nivel, langName))
+        );
+        console.log(`[${ts()}] Curso: ${esquemas.length} esquema(s) de infografía generados.`);
+
         emit('progreso', { paso: 4, mensaje: `Generando ${cantidadImagenes} imagen(es) con ${apiImagen}...` });
         console.log(`[${ts()}] Curso: iniciando imágenes api=${apiImagen} modelo=${modeloImagen} cantidad=${cantidadImagenes}`);
 
-        const segmentosGuion = dividirGuionEnSegmentos(guion, cantidadImagenes);
-        const promptsImagen = segmentosGuion.map((segmento) =>
-          `Professional educational infographic for an online course video about "${tema}", clearly explaining this specific idea from the script: "${segmento}". Language level ${nivel}. Rich in information: include labeled diagrams, icons with short captions, charts, numbered steps, or visual metaphors that make the concept easy to understand at a glance. All text, labels, captions, and signage must be short, legible, and written entirely in ${langName}, never in English or any other language, regardless of the language of this prompt. Clean modern layout, high contrast, well-organized composition. Suitable for e-learning.`
+        const promptsImagen = segmentosGuion.map((segmento, i) =>
+          `Professional educational infographic for an online course video about "${tema}", clearly explaining this specific idea from the script: "${segmento}". Language level ${nivel}. Specific content to depict: ${esquemas[i]}. All text, labels, captions, and signage must be short, legible, and written entirely in ${langName}, never in English or any other language, regardless of the language of this prompt. Clean modern layout, high contrast, well-organized composition. Suitable for e-learning.`
         );
 
         let rutasOrdenadas;

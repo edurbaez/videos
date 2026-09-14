@@ -64,6 +64,44 @@ async function generarPromptVisual(guion, n, total, estilo = 'cinematico', escen
 }
 
 /**
+ * Analiza un fragmento de guion y devuelve un esquema concreto (en inglés) de qué
+ * información visual específica debe aparecer en la infografía que lo acompaña:
+ * palabras/frases clave, diagrama o relación a ilustrar, íconos, datos o pasos.
+ * Se usa como input del prompt de imagen para que el modelo no tenga que "adivinar".
+ *
+ * @param {string} segmento - Fragmento del guion correspondiente a esta imagen
+ * @param {string} tema     - Tema general del curso/video
+ * @param {string} nivel    - Nivel (ej. A1-C2)
+ * @param {string} langName - Idioma en el que debe estar el texto de la imagen
+ * @returns {string} - Esquema de contenido visual en inglés
+ */
+async function generarEsquemaInfografia(segmento, tema, nivel, langName) {
+  const content = `You are an educational infographic content planner. Analyze this script excerpt from a language-course video and decide EXACTLY what visual information the accompanying infographic must contain.
+
+Course topic: "${tema}"
+Level: ${nivel}
+Script excerpt: "${segmento}"
+
+Return a short, concrete list (3-5 items max) of the specific visual elements to include: exact key words/phrases to display (written in ${langName}), what diagram or relationship to illustrate, what icons to use, what data or steps to number. Be literal and specific to this excerpt, not generic. Answer only with the list, in English except for the ${langName} words/phrases to display, ready to be inserted into an image-generation prompt.`;
+
+  const resp = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content }],
+      temperature: 0.5,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+  return resp.data.choices[0].message.content.trim();
+}
+
+/**
  * Llama a OpenAI Images (gpt-image-1, gpt-image-1-mini) con modelo configurable.
  * Modelos soportados: gpt-image-1, gpt-image-1-mini
  * Size portrait 9:16 → 1024x1536 (gpt-image-1 no soporta 1024x1792 de DALL-E 3)
@@ -504,4 +542,4 @@ async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPr
   return rutas;
 }
 
-module.exports = { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, obtenerGaleria };
+module.exports = { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria };
