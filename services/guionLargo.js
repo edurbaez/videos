@@ -181,4 +181,4 @@ async function generarGuionLargo(opciones, onSeccion) {
   };
 }
 
-module.exports = { generarGuionLargo, parsearDialogo, limpiarEtiquetas, planificar, PALABRAS_POR_MINUTO };
+module.exports = { generarGuionLargo, parsearDialogo, limpiarEtiquetas, planificar, chat, LANG_NAMES, PALABRAS_POR_MINUTO };

@@ -12,9 +12,13 @@ const PAUSA_TURNO = 0.35;
 const PAUSA_CHUNK = 0.2;
 const PAUSA_SECCION = 0.9;
 
+function dividirOraciones(texto) {
+  return texto.match(/[^.!?…]+[.!?…]*["»”]?\s*/g) || [texto];
+}
+
 /** Divide un texto en trozos <= MAX_BYTES_CHUNK respetando límites de oración. */
 function trocearTexto(texto) {
-  const oraciones = texto.match(/[^.!?…]+[.!?…]*["»”]?\s*/g) || [texto];
+  const oraciones = dividirOraciones(texto);
   const trozos = [];
   let actual = '';
   for (const oracion of oraciones) {
@@ -74,7 +78,7 @@ async function unirPiezas(piezas, rutaDestino) {
  * @param {object[]} secciones  - [{ titulo, texto }]
  * @param {object}   opciones   - { formato: 'monologo'|'dialogo', genero, tts, idioma, dirTrabajo }
  * @param {function} [onProgreso] - (hechos, total) => void
- * @returns {{ duracionTotal: number, capitulos: [{ titulo, inicio }] }}
+ * @returns {{ duracionTotal: number, capitulos: [{ titulo, inicio }], segmentos: [{ seccion, voz, texto, inicio, fin }] }}
  */
 async function generarAudioLargo(secciones, rutaDestino, opciones, onProgreso) {
   const { formato, genero, tts, idioma, dirTrabajo } = opciones;
@@ -82,8 +86,8 @@ async function generarAudioLargo(secciones, rutaDestino, opciones, onProgreso) {
 
   const piezasPorSeccion = secciones.map((sec, s) => {
     const turnos = formato === 'dialogo'
-      ? parsearDialogo(sec.texto).map(t => ({ genero: t.voz === 'F' ? 'femenino' : 'masculino', texto: t.texto }))
-      : [{ genero, texto: sec.texto.replace(/\s*\n+\s*/g, ' ') }];
+      ? parsearDialogo(sec.texto).map(t => ({ voz: t.voz, genero: t.voz === 'F' ? 'femenino' : 'masculino', texto: t.texto }))
+      : [{ voz: null, genero, texto: sec.texto.replace(/\s*\n+\s*/g, ' ') }];
 
     const piezas = [];
     turnos.forEach((turno, t) => {
@@ -92,6 +96,7 @@ async function generarAudioLargo(secciones, rutaDestino, opciones, onProgreso) {
         const ultimoDelTurno = c === trozos.length - 1;
         piezas.push({
           texto: trozo,
+          voz: turno.voz,
           genero: turno.genero,
           ruta: path.join(dirTrabajo, `s${s}-t${t}-c${c}.mp3`),
           pausa: ultimoDelTurno && formato === 'dialogo' ? PAUSA_TURNO : PAUSA_CHUNK,
@@ -106,6 +111,7 @@ async function generarAudioLargo(secciones, rutaDestino, opciones, onProgreso) {
   let hechos = 0;
   await ejecutarConLimite(todas.map(p => async () => {
     await generarAudio(p.texto, p.ruta, p.genero, tts, idioma);
+    p.duracion = await obtenerDuracionAudio(p.ruta);
     hechos++;
     if (onProgreso) onProgreso(hechos, todas.length);
   }), CONCURRENCIA_TTS);
@@ -118,10 +124,13 @@ async function generarAudioLargo(secciones, rutaDestino, opciones, onProgreso) {
   }
 
   const capitulos = [];
+  const segmentos = [];
   let inicio = 0;
   for (let s = 0; s < rutasSeccion.length; s++) {
+    const duracionSeccion = await obtenerDuracionAudio(rutasSeccion[s]);
     capitulos.push({ titulo: secciones[s].titulo, inicio });
-    inicio += await obtenerDuracionAudio(rutasSeccion[s]);
+    segmentos.push(...segmentarSeccion(piezasPorSeccion[s], s, inicio, duracionSeccion));
+    inicio += duracionSeccion;
   }
 
   // Todas las secciones ya comparten formato: concat demuxer sin recodificar
@@ -129,7 +138,31 @@ async function generarAudioLargo(secciones, rutaDestino, opciones, onProgreso) {
   fs.writeFileSync(lista, rutasSeccion.map(r => `file '${r.replace(/\\/g, '/')}'`).join('\n'), 'utf-8');
   await ejecutarFFmpeg(['-f', 'concat', '-safe', '0', '-i', lista, '-c', 'copy', '-y', rutaDestino]);
 
-  return { duracionTotal: await obtenerDuracionAudio(rutaDestino), capitulos };
+  return { duracionTotal: await obtenerDuracionAudio(rutaDestino), capitulos, segmentos };
+}
+
+/**
+ * Línea de tiempo por oración de una sección. Los tiempos por pieza son exactos; dentro de
+ * una pieza se reparten por longitud de oración. Se reescala a la duración real de la sección
+ * para absorber el desfase del remuestreo/concat.
+ */
+function segmentarSeccion(piezas, seccion, inicioSeccion, duracionSeccion) {
+  const bruto = piezas.reduce((a, p) => a + p.duracion + p.pausa, 0);
+  const escala = bruto > 0 ? duracionSeccion / bruto : 1;
+  const segmentos = [];
+  let t = inicioSeccion;
+  for (const p of piezas) {
+    const oraciones = dividirOraciones(p.texto).map(o => o.trim()).filter(Boolean);
+    const chars = oraciones.reduce((a, o) => a + o.length, 0) || 1;
+    const durHabla = p.duracion * escala;
+    for (const o of oraciones) {
+      const d = durHabla * o.length / chars;
+      segmentos.push({ seccion, voz: p.voz, texto: o, inicio: t, fin: t + d });
+      t += d;
+    }
+    t += p.pausa * escala;
+  }
+  return segmentos;
 }
 
 /** Formatea segundos como capítulo de YouTube (m:ss o h:mm:ss). */

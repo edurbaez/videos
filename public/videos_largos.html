@@ -243,6 +243,15 @@
       </div>
     </div>
 
+    <div class="field">
+      <label for="seg-imagen">Una imagen cada</label>
+      <div class="range-row">
+        <input type="range" id="seg-imagen" min="10" max="120" step="5" value="30" oninput="actualizarUI()" />
+        <span class="range-val" id="seg-imagen-val">30 s</span>
+      </div>
+      <div class="hint" id="seg-imagen-hint"></div>
+    </div>
+
     <label class="check"><input type="checkbox" id="yt-activo" onchange="actualizarUI()" /> Subir a YouTube</label>
     <div class="sub-panel hidden" id="yt-panel">
       <div class="grid2">
@@ -315,6 +324,9 @@
     const esVideo = $('modo').value === 'video';
     $('card-video').classList.toggle('hidden', !esVideo);
     $('field-modelo').classList.toggle('hidden', $('api-imagen').value !== 'openai');
+    const segImg = +$('seg-imagen').value;
+    $('seg-imagen-val').textContent = `${segImg} s`;
+    $('seg-imagen-hint').textContent = `≈ ${Math.max(1, Math.round(min * 60 / segImg))} imágenes, sincronizadas con lo que se dice`;
 
     const yt = $('yt-activo').checked;
     $('yt-panel').classList.toggle('hidden', !yt);
@@ -329,6 +341,11 @@
       const cfg = await (await fetch('/largo/config')).json();
       $('minutos').min = cfg.minMinutos;
       $('minutos').max = cfg.maxMinutos;
+      if (cfg.segundosPorImagen) {
+        $('seg-imagen').min = cfg.minSegundosImagen;
+        $('seg-imagen').max = cfg.maxSegundosImagen;
+        $('seg-imagen').value = cfg.segundosPorImagen;
+      }
     } catch {}
     actualizarUI();
   }
@@ -388,6 +405,7 @@
       tts: estado.tts,
       apiImagen: $('api-imagen').value,
       modeloImagen: $('modelo-imagen').value,
+      segundosPorImagen: +$('seg-imagen').value,
       subirYoutube,
       canalYoutube: $('yt-canal').value,
       privacidadYoutube: $('yt-privacidad').value,
@@ -421,7 +439,7 @@
     log(`Iniciado: ${datos.minutos} min en ${datos.secciones} secciones`, 'hi');
 
     // Peso aproximado de cada fase en la barra
-    const peso = modo === 'guion' ? { guion: 100, audio: 0 } : modo === 'audio' ? { guion: 55, audio: 45 } : { guion: 45, audio: 35 };
+    const peso = modo === 'guion' ? { guion: 100, audio: 0, imagenes: 0 } : modo === 'audio' ? { guion: 55, audio: 45, imagenes: 0 } : { guion: 35, audio: 25, imagenes: 30 };
 
     const sse = new EventSource(`/largo/progreso/${datos.id}`);
     const fin = () => { sse.close(); $('btn-gen').disabled = false; cargarLista(); };
@@ -439,7 +457,9 @@
     });
     on('audio_progreso', d => setBar(peso.guion + peso.audio * d.hechos / d.total));
     on('audio_listo', d => log(`Audio listo: ${fmtDur(d.duracion)} · ${d.capitulos.length} capítulos`, 'ok'));
-    on('imagen_lista', () => { log('Imagen lista', 'ok'); setBar(peso.guion + peso.audio + 5); });
+    on('escenas_listas', d => log(`Prompts listos: ${d.total} escenas de ~${d.segundosPorImagen}s`, 'hi'));
+    on('imagenes_progreso', d => setBar(peso.guion + peso.audio + peso.imagenes * d.hechos / d.total));
+    on('imagen_lista', d => log(`Imágenes listas: ${d.total}${d.reutilizadas ? ` (${d.reutilizadas} reutilizadas por fallo)` : ''}`, d.reutilizadas ? 'err' : 'ok'));
     on('video_listo', () => { log('Video renderizado', 'ok'); setBar(95); });
     on('youtube_listo', d => log(`Publicado en YouTube: ${d.url}`, 'ok'));
     on('youtube_error', d => log(`YouTube: ${d.mensaje}`, 'err'));
@@ -467,6 +487,7 @@
             ${it.mp3 ? `<a href="${esc(it.mp3)}" download>MP3</a>` : ''}
             ${it.video ? `<a href="${esc(it.video)}" download>MP4</a>` : ''}
             ${it.png ? `<a href="${esc(it.png)}" target="_blank">Imagen</a>` : ''}
+            ${it.escenas ? `<a href="${esc(it.escenas)}" target="_blank">Escenas (${it.numImagenes})</a>` : ''}
             ${it.youtubeUrl ? `<a href="${esc(it.youtubeUrl)}" target="_blank" rel="noopener">YouTube</a>` : ''}
           </div>
         </div>`).join('');

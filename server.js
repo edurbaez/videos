@@ -14,10 +14,11 @@ const { listarNichos, cargarNicho } = require('./services/nichos');
 const { generarGuion } = require('./services/guion');
 const { generarCaption } = require('./services/caption');
 const { generarAudio, resolverVozGoogle } = require('./services/audio');
-const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria, llamarOpenAIImagen, llamarGoogleImagen } = require('./services/imagenes');
-const { generarVideo, generarVideoImagenFija } = require('./services/video');
+const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria } = require('./services/imagenes');
+const { generarVideo, generarVideoEscenas } = require('./services/video');
 const { generarGuionLargo, limpiarEtiquetas, planificar, PALABRAS_POR_MINUTO } = require('./services/guionLargo');
 const { generarAudioLargo, formatearTiempo } = require('./services/audioLargo');
+const { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss } = require('./services/escenasLargo');
 const { generarSubtitulos } = require('./services/subtitulos');
 const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = require('./services/telegram');
 const yt = require('./services/youtube');
@@ -34,6 +35,9 @@ const DIR_LARGO = path.join(__dirname, 'output', 'largo');
 fs.mkdirSync(DIR_LARGO, { recursive: true });
 const LARGO_MIN_MINUTOS = 3;
 const LARGO_MAX_MINUTOS = parseInt(process.env.LARGO_MAX_MINUTOS) || 30;
+const LARGO_SEG_IMAGEN_MIN = 10;
+const LARGO_SEG_IMAGEN_MAX = 120;
+const LARGO_SEGUNDOS_POR_IMAGEN = Math.min(LARGO_SEG_IMAGEN_MAX, Math.max(LARGO_SEG_IMAGEN_MIN, parseInt(process.env.LARGO_SEGUNDOS_POR_IMAGEN) || 30));
 
 const CURSO_LANG_NAMES = {
   de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
@@ -968,7 +972,10 @@ Script to revise:
 
 // ── GET /largo/config ──────────────────────────────────────────────────────────
 app.get('/largo/config', (req, res) => {
-  res.json({ minMinutos: LARGO_MIN_MINUTOS, maxMinutos: LARGO_MAX_MINUTOS, palabrasPorMinuto: PALABRAS_POR_MINUTO });
+  res.json({
+    minMinutos: LARGO_MIN_MINUTOS, maxMinutos: LARGO_MAX_MINUTOS, palabrasPorMinuto: PALABRAS_POR_MINUTO,
+    segundosPorImagen: LARGO_SEGUNDOS_POR_IMAGEN, minSegundosImagen: LARGO_SEG_IMAGEN_MIN, maxSegundosImagen: LARGO_SEG_IMAGEN_MAX,
+  });
 });
 
 // ── GET /largo/archivos ───────────────────────────────────────────────────────
@@ -1009,6 +1016,8 @@ app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
   const palabras = req.body.palabras ? String(req.body.palabras).trim().slice(0, 300) : '';
   const minutosNum = parseInt(req.body.minutos);
   const minutos  = Math.min(LARGO_MAX_MINUTOS, Math.max(LARGO_MIN_MINUTOS, isNaN(minutosNum) ? 10 : minutosNum));
+  const segNum   = parseInt(req.body.segundosPorImagen);
+  const segundosPorImagen = isNaN(segNum) ? LARGO_SEGUNDOS_POR_IMAGEN : Math.min(LARGO_SEG_IMAGEN_MAX, Math.max(LARGO_SEG_IMAGEN_MIN, segNum));
   const apiImagen = req.body.apiImagen === 'google' ? 'google' : 'openai';
   const modeloImagen = apiImagen === 'google'
     ? 'imagen-3.0-generate-002'
@@ -1044,10 +1053,12 @@ app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
     const dirTrabajo = path.join(DIR_LARGO, id);
     const rutaTxt  = path.join(DIR_LARGO, `${id}.txt`);
     const rutaMp3  = path.join(DIR_LARGO, `${id}.mp3`);
-    const rutaPng  = path.join(DIR_LARGO, `${id}.png`);
+    const dirImg   = path.join(DIR_LARGO, `${id}-img`);
+    const rutaAss  = path.join(dirTrabajo, 'textos.ass');
+    const rutaEscenas = path.join(DIR_LARGO, `${id}-escenas.json`);
     const rutaMp4  = path.join(DIR_LARGO, `${id}.mp4`);
     const rutaMeta = path.join(DIR_LARGO, `${id}.json`);
-    const url = f => `/output/largo/${path.basename(f)}`;
+    const url = f => `/output/largo/${path.relative(DIR_LARGO, f).replace(/\\/g, '/')}`;
 
     try {
       console.log(`[${ts()}] Largo ${id}: tema="${tema}" idioma=${idioma} nivel=${nivel} formato=${formato} minutos=${minutos} tts=${tts} modo=${modo}`);
@@ -1082,12 +1093,16 @@ app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
 
       // ── 2. Audio troceado ───────────────────────────────────────────────
       let capitulos = [];
+      let segmentos = [];
+      let duracionAudio = 0;
       if (modo !== 'guion') {
         emit('progreso', { paso: 2, mensaje: `Sintetizando audio (${tts}, ${formato === 'dialogo' ? '2 voces' : 'voz ' + genero})...` });
         const audio = await generarAudioLargo(guion.secciones, rutaMp3, { formato, genero, tts, idioma, dirTrabajo }, (hechos, total) => {
           emit('audio_progreso', { hechos, total });
         });
         capitulos = audio.capitulos;
+        segmentos = audio.segmentos;
+        duracionAudio = audio.duracionTotal;
         meta.mp3 = url(rutaMp3);
         meta.duracion = Math.round(audio.duracionTotal);
         meta.capitulos = capitulos.map(c => ({ titulo: c.titulo, inicio: formatearTiempo(c.inicio) }));
@@ -1096,20 +1111,38 @@ app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
         console.log(`[${ts()}] Largo ${id}: audio ${meta.duracion}s`);
       }
 
-      // ── 3. Imagen + video horizontal ────────────────────────────────────
+      // ── 3. Escenas + director de arte + imágenes + video horizontal ─────
       if (modo === 'video') {
-        emit('progreso', { paso: 3, mensaje: `Generando imagen de portada (${apiImagen})...` });
-        const langName = CURSO_LANG_NAMES[idioma];
-        const promptImg = `Clean, modern 16:9 cover illustration for an educational language-learning video titled "${guion.titulo}" (topic: ${tema}, level ${nivel}). Friendly, professional e-learning style, high contrast, uncluttered composition. Any visible text must be short, legible and written only in ${langName}.`;
-        const buffer = apiImagen === 'google'
-          ? await llamarGoogleImagen(promptImg, modeloImagen, '16:9')
-          : await llamarOpenAIImagen(promptImg, modeloImagen, 'high', '1536x1024');
-        fs.writeFileSync(rutaPng, buffer);
-        meta.png = url(rutaPng);
-        emit('imagen_lista', { png: meta.png });
+        const escenas = agruparEscenas(segmentos, segundosPorImagen, duracionAudio);
+        emit('progreso', { paso: 3, mensaje: `Director de arte: guía de estilo y prompts para ${escenas.length} escenas (~${segundosPorImagen}s c/u)...` });
+        const guia = await dirigirArte(escenas, {
+          titulo: guion.titulo, tema, idioma, nivel, formato, secciones: guion.secciones,
+        });
+        emit('escenas_listas', { total: escenas.length, segundosPorImagen });
 
-        emit('progreso', { paso: 4, mensaje: 'Renderizando video 1920×1080...' });
-        await generarVideoImagenFija(rutaMp3, rutaPng, rutaMp4);
+        emit('progreso', { paso: 4, mensaje: `Generando ${escenas.length} imágenes (${apiImagen})...` });
+        await generarImagenesEscenas(escenas, guia, { apiImagen, modeloImagen, dir: dirImg }, (hechos, total) => {
+          emit('imagenes_progreso', { hechos, total });
+        });
+        const reutilizadas = escenas.filter(e => e.imagenReutilizada).length;
+        if (reutilizadas) console.warn(`[${ts()}] Largo ${id}: ${reutilizadas} escenas reutilizan imagen vecina por fallo`);
+
+        fs.writeFileSync(rutaEscenas, JSON.stringify({
+          segundosPorImagen,
+          guia,
+          escenas: escenas.map(e => ({
+            n: e.n, inicio: +e.inicio.toFixed(2), fin: +e.fin.toFixed(2), textoPantalla: e.textoPantalla,
+            prompt: e.prompt, imagen: url(e.imagen), reutilizada: !!e.imagenReutilizada, texto: e.texto,
+          })),
+        }, null, 2), 'utf-8');
+        meta.png = url(escenas[0].imagen);
+        meta.escenas = url(rutaEscenas);
+        meta.numImagenes = escenas.length;
+        emit('imagen_lista', { png: meta.png, total: escenas.length, reutilizadas });
+
+        emit('progreso', { paso: 5, mensaje: 'Renderizando video 1920×1080...' });
+        const conTexto = escribirAss(escenas, rutaAss);
+        await generarVideoEscenas(rutaMp3, escenas, rutaMp4, { rutaAss: conTexto ? rutaAss : null, dirTrabajo });
         meta.video = url(rutaMp4);
         guardarMeta();
         emit('video_listo', { video: meta.video });
@@ -1118,7 +1151,7 @@ app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
       // ── 4. YouTube (opcional, error no fatal) ───────────────────────────
       if (subirYoutube) {
         try {
-          emit('progreso', { paso: 5, mensaje: 'Generando metadatos y subiendo a YouTube...' });
+          emit('progreso', { paso: 6, mensaje: 'Generando metadatos y subiendo a YouTube...' });
           const textoPlano = limpiarEtiquetas(guion.secciones.map(s => s.texto).join('\n'));
           const ytMeta = await yt.generarMetadatosYoutube(tema, textoPlano, idioma, nivel, { esShort: false });
           // YouTube rechaza '<' y '>' en título y descripción

@@ -93,7 +93,8 @@ El objeto `nichoConfig` que viaja por todo el pipeline tiene esta forma:
 | `services/telegram.js` | Envío de archivos y mensajes a Telegram |
 | `services/youtube.js` | Subida a YouTube (OAuth2 por canal, metadata GPT) |
 | `services/guionLargo.js` | Guion largo por secciones (esquema + sección a sección), monólogo o diálogo F/M |
-| `services/audioLargo.js` | TTS troceado (≤4000 bytes/pieza), une secciones con FFmpeg y calcula capítulos |
+| `services/audioLargo.js` | TTS troceado (≤4000 bytes/pieza), une secciones con FFmpeg, calcula capítulos y línea de tiempo por oración |
+| `services/escenasLargo.js` | Agrupa la línea de tiempo en escenas (~N s), director de arte (guía de estilo + prompt/texto por escena, prompts en `prompts/largo/`), imágenes por escena y ASS con texto clave |
 | `utils/prompts.js` | `renderPrompt()` y `joinHashtags()` |
 | `utils/estilos.js` | Mapas de estilos/escenarios (ES → EN) para prompts |
 | `utils/archivos.js` | Rutas de output y creación de carpetas |
@@ -170,6 +171,7 @@ PORT              (opcional, default 3000)
 API_KEY           (opcional — activa autenticación por header x-api-key)
 CORS_ORIGIN       (opcional — default http://localhost:PORT)
 LARGO_MAX_MINUTOS (opcional — duración máxima de videos largos, default 30)
+LARGO_SEGUNDOS_POR_IMAGEN (opcional — default de segundos por imagen en videos largos, 10–120, default 30)
 ```
 
 ---

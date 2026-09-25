@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 require('dotenv').config();
 
@@ -197,18 +198,34 @@ async function generarVideo(rutaAudio, rutasImagenes, rutaDestino, rutaSRT = nul
 }
 
 /**
- * Video horizontal con una sola imagen fija durante todo el audio.
+ * Video horizontal con una imagen por escena (cortes limpios) y texto ASS quemado opcional.
+ * Usa el concat demuxer en lugar de xfade: con decenas de imágenes xfade dispara memoria y tiempo.
+ *
+ * @param {object[]} escenas - [{ imagen, inicio, fin }] contiguas y ordenadas
  */
-async function generarVideoImagenFija(rutaAudio, rutaImagen, rutaDestino, ancho = 1920, alto = 1080) {
+async function generarVideoEscenas(rutaAudio, escenas, rutaDestino, { rutaAss = null, dirTrabajo, ancho = 1920, alto = 1080 } = {}) {
   const ts = () => new Date().toTimeString().slice(0, 8);
   const duracion = await obtenerDuracionAudio(rutaAudio);
-  console.log(`[${ts()}] Video fijo: ${ancho}x${alto}, duración ${duracion.toFixed(1)}s`);
+  console.log(`[${ts()}] Video escenas: ${escenas.length} imágenes, duración ${duracion.toFixed(1)}s`);
 
-  // Imagen estática: fps bajo + tune stillimage mantiene el render rápido en videos de 30+ min
+  const linea = r => `file '${r.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`;
+  const lista = escenas.flatMap(e => [linea(e.imagen), `duration ${Math.max(0.1, e.fin - e.inicio).toFixed(3)}`]);
+  // El concat demuxer ignora la duración del último archivo si no se repite
+  lista.push(linea(escenas[escenas.length - 1].imagen));
+  const rutaLista = path.join(dirTrabajo, 'escenas.txt');
+  fs.writeFileSync(rutaLista, lista.join('\n'), 'utf-8');
+
+  // OpenAI entrega 3:2 (1536x1024): se recorta arriba/abajo para llenar 16:9 sin barras
+  let vf = `scale=${ancho}:${alto}:force_original_aspect_ratio=increase,crop=${ancho}:${alto},setsar=1,fps=5`;
+  // En -vf las comillas se consumen antes del parseo de opciones: el ':' de la unidad (C:) debe ir escapado
+  if (rutaAss) vf += `,subtitles=filename='${escaparRutaSRT(rutaAss).replace(/:/g, '\\:')}'`;
+
+  // fps bajo + tune stillimage mantiene el render rápido en videos de 30+ min
+
   await ejecutarFFmpeg([
-    '-loop', '1', '-framerate', '5', '-i', rutaImagen,
+    '-f', 'concat', '-safe', '0', '-i', rutaLista,
     '-i', rutaAudio,
-    '-vf', `scale=${ancho}:${alto}:force_original_aspect_ratio=decrease,pad=${ancho}:${alto}:(ow-iw)/2:(oh-ih)/2:black,setsar=1`,
+    '-vf', vf,
     '-map', '0:v', '-map', '1:a',
     '-c:v', 'libx264', '-tune', 'stillimage', '-preset', 'veryfast', '-crf', '23', '-r', '5',
     '-c:a', 'aac', '-b:a', '192k',
@@ -220,4 +237,4 @@ async function generarVideoImagenFija(rutaAudio, rutaImagen, rutaDestino, ancho 
   return rutaDestino;
 }
 
-module.exports = { generarVideo, generarVideoImagenFija, obtenerDuracionAudio, ejecutarFFmpeg };
+module.exports = { generarVideo, generarVideoEscenas, obtenerDuracionAudio, ejecutarFFmpeg };
