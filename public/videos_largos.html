@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Videos largos de idiomas</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d0f;
+      --surface: #18181c;
+      --surface2:#222228;
+      --border:  #2e2e38;
+      --accent:  #6366f1;
+      --accent2: #818cf8;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --warn:    #f59e0b;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+    .container { max-width: 760px; margin: 0 auto; }
+
+    .nav { display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
+    .nav a {
+      color: var(--muted); text-decoration: none; font-size: 0.82rem;
+      padding: 5px 13px; border: 1px solid var(--border); border-radius: 20px;
+      transition: color .2s, border-color .2s;
+    }
+    .nav a:hover { color: var(--text); border-color: var(--accent); }
+    .nav a.active { color: var(--accent2); border-color: var(--accent2); }
+
+    h1 {
+      font-size: 1.65rem; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 6px;
+    }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--muted); margin-bottom: 16px;
+    }
+
+    label { display: block; font-size: 0.83rem; color: var(--muted); margin-bottom: 6px; }
+    .field { margin-bottom: 16px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 560px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+    textarea, select, input[type="text"], input[type="number"], input[type="datetime-local"] {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); padding: 11px 14px; font-size: 0.95rem;
+      font-family: inherit; outline: none; resize: vertical; transition: border-color .2s;
+    }
+    textarea:focus, select:focus, input:focus { border-color: var(--accent); }
+    select option { background: var(--surface2); }
+
+    .seg { display: flex; gap: 8px; }
+    .seg button {
+      flex: 1; padding: 10px; border-radius: 8px; border: 2px solid var(--border);
+      background: var(--surface2); color: var(--muted); font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all .2s;
+    }
+    .seg button:hover { color: var(--text); border-color: var(--accent); }
+    .seg button.sel { border-color: var(--accent2); background: #6366f11c; color: var(--accent2); }
+
+    .range-row { display: flex; align-items: center; gap: 12px; }
+    .range-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+    .range-val { min-width: 70px; text-align: right; font-weight: 700; color: var(--accent2); }
+    .hint { font-size: 0.76rem; color: var(--muted); margin-top: 6px; }
+
+    .check { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text); cursor: pointer; }
+    .sub-panel { background: #1e1e2a; border: 1px solid #4f46e5; border-radius: 10px; padding: 16px; margin-top: 10px; }
+    .hidden { display: none !important; }
+
+    .btn-gen {
+      width: 100%; padding: 14px; border: none; border-radius: 8px; color: #fff;
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity .2s;
+    }
+    .btn-gen:hover:not(:disabled) { opacity: .88; }
+    .btn-gen:disabled { opacity: .45; cursor: not-allowed; }
+
+    .log-wrap {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px; max-height: 260px; overflow-y: auto; font-size: 0.83rem;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+    }
+    .log-line { padding: 2px 0; color: var(--muted); }
+    .log-line.ok  { color: var(--success); }
+    .log-line.err { color: var(--error); }
+    .log-line.hi  { color: var(--accent2); }
+
+    .bar { height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+    .bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #a78bfa); transition: width .3s; }
+
+    .item {
+      border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+      margin-bottom: 12px; background: var(--surface2);
+    }
+    .item h3 { font-size: 0.98rem; margin-bottom: 4px; }
+    .item .meta { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; }
+    .item .links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .item .links a {
+      font-size: 0.75rem; color: var(--muted); text-decoration: none; padding: 3px 9px;
+      border: 1px solid var(--border); border-radius: 6px;
+    }
+    .item .links a:hover { color: var(--accent2); border-color: var(--accent2); }
+    audio, video { width: 100%; border-radius: 6px; margin-top: 6px; }
+    details { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+    details ol { padding-left: 20px; margin-top: 6px; line-height: 1.6; }
+    .empty { text-align: center; color: var(--muted); padding: 20px 0; font-size: 0.9rem; }
+    .yt-ok   { color: var(--success); font-size: 0.8rem; }
+    .yt-warn { color: var(--warn); font-size: 0.8rem; }
+    .yt-warn a { color: var(--accent2); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <nav class="nav">
+    <a href="/index.html">Inicio</a>
+    <a href="/videos_curso.html">Videos de curso</a>
+    <a href="/videos_largos.html" class="active">Videos largos</a>
+    <a href="/estadisticas.html">Estadísticas</a>
+  </nav>
+
+  <h1>Videos largos de idiomas</h1>
+  <p class="subtitle">Lección horizontal (1920×1080) generada por secciones, con una o dos voces.</p>
+
+  <div class="card">
+    <div class="card-title">Contenido</div>
+
+    <div class="field">
+      <label for="tema">Tema de la lección</label>
+      <textarea id="tema" rows="2" maxlength="500" placeholder="Ej: El pretérito perfecto en alemán con verbos irregulares"></textarea>
+    </div>
+
+    <div class="grid3">
+      <div class="field">
+        <label for="idioma">Idioma</label>
+        <select id="idioma">
+          <option value="de">Alemán</option>
+          <option value="en">Inglés</option>
+          <option value="es">Español</option>
+          <option value="fr">Francés</option>
+          <option value="pt">Portugués</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="nivel">Nivel</label>
+        <select id="nivel">
+          <option>A1</option><option>A2</option><option selected>B1</option>
+          <option>B2</option><option>C1</option><option>C2</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="modo">Generar</label>
+        <select id="modo" onchange="actualizarUI()">
+          <option value="guion">Solo guion</option>
+          <option value="audio">Guion + audio</option>
+          <option value="video" selected>Video completo</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="minutos">Duración objetivo</label>
+      <div class="range-row">
+        <input type="range" id="minutos" min="3" max="30" step="1" value="10" oninput="actualizarUI()" />
+        <span class="range-val" id="minutos-val">10 min</span>
+      </div>
+      <div class="hint" id="minutos-hint"></div>
+    </div>
+
+    <div class="field">
+      <label for="palabras">Vocabulario obligatorio (opcional)</label>
+      <input type="text" id="palabras" maxlength="300" placeholder="Palabras o expresiones separadas por comas" />
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Voz</div>
+
+    <div class="field">
+      <label>Formato</label>
+      <div class="seg" id="seg-formato">
+        <button type="button" data-v="monologo" class="sel">Una voz</button>
+        <button type="button" data-v="dialogo">Diálogo (F + M)</button>
+      </div>
+      <div class="hint" id="formato-hint"></div>
+    </div>
+
+    <div class="field" id="field-genero">
+      <label>Voz del narrador</label>
+      <div class="seg" id="seg-genero">
+        <button type="button" data-v="femenino">Femenina</button>
+        <button type="button" data-v="masculino" class="sel">Masculina</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Motor TTS</label>
+      <div class="seg" id="seg-tts">
+        <button type="button" data-v="google" class="sel">Google Neural2</button>
+        <button type="button" data-v="openai">OpenAI</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="card-video">
+    <div class="card-title">Imagen y publicación</div>
+
+    <div class="grid2">
+      <div class="field">
+        <label for="api-imagen">API de imagen</label>
+        <select id="api-imagen" onchange="actualizarUI()">
+          <option value="openai">OpenAI</option>
+          <option value="google">Google Imagen 3</option>
+        </select>
+      </div>
+      <div class="field" id="field-modelo">
+        <label for="modelo-imagen">Modelo</label>
+        <select id="modelo-imagen">
+          <option value="gpt-image-1-mini">gpt-image-1-mini</option>
+          <option value="gpt-image-1">gpt-image-1</option>
+        </select>
+      </div>
+    </div>
+
+    <label class="check"><input type="checkbox" id="yt-activo" onchange="actualizarUI()" /> Subir a YouTube</label>
+    <div class="sub-panel hidden" id="yt-panel">
+      <div class="grid2">
+        <div class="field">
+          <label for="yt-canal">Canal</label>
+          <select id="yt-canal" onchange="mostrarEstadoCanal()"><option value="">Cargando...</option></select>
+          <div id="yt-estado" style="margin-top:6px;"></div>
+        </div>
+        <div class="field">
+          <label for="yt-privacidad">Privacidad</label>
+          <select id="yt-privacidad">
+            <option value="private">Privado</option>
+            <option value="unlisted">No listado</option>
+            <option value="public">Público</option>
+          </select>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="yt-programar" onchange="actualizarUI()" /> Programar publicación</label>
+      <div class="field hidden" id="yt-fecha-wrap" style="margin-top:10px;">
+        <input type="datetime-local" id="yt-fecha" />
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-gen" id="btn-gen" onclick="generar()">Generar</button>
+
+  <div class="card hidden" id="card-progreso" style="margin-top:20px;">
+    <div class="card-title">Progreso</div>
+    <div class="bar"><div id="bar"></div></div>
+    <div class="log-wrap" id="log"></div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <div class="card-title">Generados</div>
+    <div id="lista"><div class="empty">Cargando...</div></div>
+  </div>
+</div>
+
+<script>
+  const PPM = 140;
+  const estado = { formato: 'monologo', genero: 'masculino', tts: 'google' };
+  let ytCanales = [];
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtDur = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+
+  document.querySelectorAll('.seg').forEach(seg => {
+    const clave = seg.id.replace('seg-', '');
+    seg.addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b === btn));
+      estado[clave] = btn.dataset.v;
+      actualizarUI();
+    });
+  });
+
+  function actualizarUI() {
+    const min = +$('minutos').value;
+    const secciones = Math.max(3, Math.round(min / 2));
+    $('minutos-val').textContent = `${min} min`;
+    $('minutos-hint').textContent = `≈ ${(min * PPM).toLocaleString()} palabras en ${secciones} secciones de ~2 min`;
+
+    $('field-genero').classList.toggle('hidden', estado.formato === 'dialogo');
+    $('formato-hint').textContent = estado.formato === 'dialogo'
+      ? 'F = profesora que explica · M = alumno que pregunta y practica'
+      : '';
+
+    const esVideo = $('modo').value === 'video';
+    $('card-video').classList.toggle('hidden', !esVideo);
+    $('field-modelo').classList.toggle('hidden', $('api-imagen').value !== 'openai');
+
+    const yt = $('yt-activo').checked;
+    $('yt-panel').classList.toggle('hidden', !yt);
+    if (yt && !ytCanales.length) cargarCanales();
+    const programar = $('yt-programar').checked;
+    $('yt-fecha-wrap').classList.toggle('hidden', !programar);
+    $('yt-privacidad').disabled = programar;
+  }
+
+  async function cargarConfig() {
+    try {
+      const cfg = await (await fetch('/largo/config')).json();
+      $('minutos').min = cfg.minMinutos;
+      $('minutos').max = cfg.maxMinutos;
+    } catch {}
+    actualizarUI();
+  }
+
+  async function cargarCanales() {
+    const sel = $('yt-canal');
+    try {
+      const resp = await fetch('/youtube/canales');
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        sel.innerHTML = `<option value="">⚠ ${esc(err.error || 'YouTube no configurado')}</option>`;
+        return;
+      }
+      ytCanales = await resp.json();
+      sel.innerHTML = ytCanales.length
+        ? ytCanales.map(c => `<option value="${esc(c.nombre)}">${esc(c.label)}${c.autorizado ? '' : ' ⚠ sin autorizar'}</option>`).join('')
+        : '<option value="">Sin canales configurados</option>';
+      mostrarEstadoCanal();
+    } catch {
+      sel.innerHTML = '<option value="">Error al cargar canales</option>';
+    }
+  }
+
+  function mostrarEstadoCanal() {
+    const canal = ytCanales.find(c => c.nombre === $('yt-canal').value);
+    const div = $('yt-estado');
+    if (!canal) { div.innerHTML = ''; return; }
+    div.innerHTML = canal.autorizado
+      ? '<span class="yt-ok">✓ Autorizado</span>'
+      : `<span class="yt-warn">⚠ <a href="/youtube/auth?canal=${encodeURIComponent(canal.nombre)}" target="_blank">Autorizar</a></span>`;
+  }
+
+  function log(texto, clase = '') {
+    const div = document.createElement('div');
+    div.className = 'log-line ' + clase;
+    div.textContent = `[${new Date().toTimeString().slice(0, 8)}] ${texto}`;
+    $('log').appendChild(div);
+    $('log').scrollTop = $('log').scrollHeight;
+  }
+  const setBar = pct => { $('bar').style.width = `${Math.min(100, pct)}%`; };
+
+  async function generar() {
+    const tema = $('tema').value.trim();
+    if (!tema) { alert('Escribe un tema.'); return; }
+
+    const modo = $('modo').value;
+    const subirYoutube = modo === 'video' && $('yt-activo').checked;
+    const body = {
+      tema,
+      idioma: $('idioma').value,
+      nivel: $('nivel').value,
+      minutos: +$('minutos').value,
+      modo,
+      palabras: $('palabras').value.trim(),
+      formato: estado.formato,
+      genero: estado.genero,
+      tts: estado.tts,
+      apiImagen: $('api-imagen').value,
+      modeloImagen: $('modelo-imagen').value,
+      subirYoutube,
+      canalYoutube: $('yt-canal').value,
+      privacidadYoutube: $('yt-privacidad').value,
+      publicarYoutubeEn: subirYoutube && $('yt-programar').checked && $('yt-fecha').value
+        ? new Date($('yt-fecha').value).toISOString() : null,
+    };
+
+    $('btn-gen').disabled = true;
+    $('card-progreso').classList.remove('hidden');
+    $('log').innerHTML = '';
+    setBar(2);
+
+    let resp;
+    try {
+      resp = await fetch('/largo/generar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      log('Error de red: ' + e.message, 'err');
+      $('btn-gen').disabled = false;
+      return;
+    }
+    const datos = await resp.json();
+    if (!resp.ok) {
+      log(datos.error || 'Error', 'err');
+      $('btn-gen').disabled = false;
+      return;
+    }
+    log(`Iniciado: ${datos.minutos} min en ${datos.secciones} secciones`, 'hi');
+
+    // Peso aproximado de cada fase en la barra
+    const peso = modo === 'guion' ? { guion: 100, audio: 0 } : modo === 'audio' ? { guion: 55, audio: 45 } : { guion: 45, audio: 35 };
+
+    const sse = new EventSource(`/largo/progreso/${datos.id}`);
+    const fin = () => { sse.close(); $('btn-gen').disabled = false; cargarLista(); };
+    const on = (ev, fn) => sse.addEventListener(ev, e => fn(JSON.parse(e.data)));
+
+    on('progreso', d => log(d.mensaje));
+    on('esquema_listo', d => log(`Esquema: "${d.titulo}" — ${d.secciones.length} secciones`, 'hi'));
+    on('seccion_lista', d => {
+      log(`Sección ${d.n}/${d.total}: ${d.titulo} (${d.palabras} palabras)`);
+      setBar(peso.guion * d.n / d.total);
+    });
+    on('guion_listo', d => {
+      const pct = Math.round(d.palabras / d.palabrasObjetivo * 100);
+      log(`Guion listo: ${d.palabras} palabras (${pct}% del objetivo, ≈ ${d.minutosEstimados} min)`, 'ok');
+    });
+    on('audio_progreso', d => setBar(peso.guion + peso.audio * d.hechos / d.total));
+    on('audio_listo', d => log(`Audio listo: ${fmtDur(d.duracion)} · ${d.capitulos.length} capítulos`, 'ok'));
+    on('imagen_lista', () => { log('Imagen lista', 'ok'); setBar(peso.guion + peso.audio + 5); });
+    on('video_listo', () => { log('Video renderizado', 'ok'); setBar(95); });
+    on('youtube_listo', d => log(`Publicado en YouTube: ${d.url}`, 'ok'));
+    on('youtube_error', d => log(`YouTube: ${d.mensaje}`, 'err'));
+    on('finalizado', () => { setBar(100); log('Completado', 'ok'); fin(); });
+    on('pipeline_error', d => { log(`Error: ${d.mensaje}`, 'err'); fin(); });
+  }
+
+  async function cargarLista() {
+    const cont = $('lista');
+    try {
+      const items = await (await fetch('/largo/archivos')).json();
+      if (!items.length) { cont.innerHTML = '<div class="empty">Aún no hay videos largos.</div>'; return; }
+      cont.innerHTML = items.map(it => `
+        <div class="item">
+          <h3>${esc(it.titulo)}</h3>
+          <div class="meta">
+            ${esc(it.idioma?.toUpperCase())} · ${esc(it.nivel)} · ${it.formato === 'dialogo' ? 'Diálogo' : 'Una voz'} · ${esc(it.tts)}
+            · ${it.palabras} palabras${it.duracion ? ' · ' + fmtDur(it.duracion) : ''}
+            · ${new Date(it.fecha).toLocaleString()}
+          </div>
+          ${it.video ? `<video controls preload="none" src="${esc(it.video)}"></video>` : it.mp3 ? `<audio controls preload="none" src="${esc(it.mp3)}"></audio>` : ''}
+          ${it.capitulos?.length ? `<details><summary>Capítulos</summary><ol>${it.capitulos.map(c => `<li>${esc(c.inicio)} — ${esc(c.titulo)}</li>`).join('')}</ol></details>` : ''}
+          <div class="links">
+            <a href="${esc(it.txt)}" target="_blank">Guion</a>
+            ${it.mp3 ? `<a href="${esc(it.mp3)}" download>MP3</a>` : ''}
+            ${it.video ? `<a href="${esc(it.video)}" download>MP4</a>` : ''}
+            ${it.png ? `<a href="${esc(it.png)}" target="_blank">Imagen</a>` : ''}
+            ${it.youtubeUrl ? `<a href="${esc(it.youtubeUrl)}" target="_blank" rel="noopener">YouTube</a>` : ''}
+          </div>
+        </div>`).join('');
+    } catch {
+      cont.innerHTML = '<div class="empty">Error al cargar la lista.</div>';
+    }
+  }
+
+  cargarConfig();
+  cargarLista();
+</script>
+</body>
+</html>

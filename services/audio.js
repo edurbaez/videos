@@ -36,17 +36,36 @@ const VOCES_OPENAI = {
   femenino:  'nova',
 };
 
+function resolverVozGoogle(idioma, genero, vozEspecifica) {
+  const vocesIdioma = VOCES_GOOGLE[idioma] || VOCES_GOOGLE['es'];
+  return {
+    nombreVoz: vozEspecifica || vocesIdioma[genero] || vocesIdioma.masculino,
+    langCode:  LANG_CODE_GOOGLE[idioma] || 'es-US',
+  };
+}
+
+/**
+ * Recorta a maxBytes UTF-8 sin partir caracteres multibyte, cortando en el último
+ * fin de oración si existe. slice() por caracteres no sirve: ä/é ocupan 2 bytes.
+ */
+function recortarPorBytes(texto, maxBytes) {
+  if (Buffer.byteLength(texto, 'utf8') <= maxBytes) return texto;
+  let recortado = Buffer.from(texto, 'utf8').subarray(0, maxBytes).toString('utf8').replace(/�+$/, '');
+  const finOracion = Math.max(recortado.lastIndexOf('. '), recortado.lastIndexOf('! '), recortado.lastIndexOf('? '));
+  if (finOracion > recortado.length * 0.5) recortado = recortado.slice(0, finOracion + 1);
+  return recortado;
+}
+
 async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es', vozEspecifica) {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const vocesIdioma = VOCES_GOOGLE[idioma] || VOCES_GOOGLE['es'];
-  const nombreVoz   = vozEspecifica || vocesIdioma[genero] || vocesIdioma.masculino;
-  const langCode    = LANG_CODE_GOOGLE[idioma] || 'es-US';
+  const { nombreVoz, langCode } = resolverVozGoogle(idioma, genero, vozEspecifica);
   console.log(`[${ts()}] Audio: sintetizando con Google TTS — voz: ${nombreVoz} lang: ${langCode} (${texto.length} chars)...`);
 
   // Google TTS permite máx 5000 bytes por petición
-  const textoTruncado = Buffer.byteLength(texto, 'utf8') > 4800
-    ? texto.slice(0, 4800)
-    : texto;
+  const textoTruncado = recortarPorBytes(texto, 4800);
+  if (textoTruncado !== texto) {
+    console.warn(`[${ts()}] Audio: texto recortado de ${Buffer.byteLength(texto, 'utf8')} a ${Buffer.byteLength(textoTruncado, 'utf8')} bytes (límite Google TTS).`);
+  }
 
   const token = await obtenerTokenTTS();
 
@@ -131,4 +150,4 @@ async function generarAudio(texto, rutaDestino, genero = 'masculino', tts = 'goo
   return generarAudioGoogle(texto, rutaDestino, genero, idioma, vozEspecifica);
 }
 
-module.exports = { generarAudio };
+module.exports = { generarAudio, resolverVozGoogle };

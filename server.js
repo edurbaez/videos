@@ -13,9 +13,11 @@ const { leerHistorial, guardarEntrada } = require('./utils/historial');
 const { listarNichos, cargarNicho } = require('./services/nichos');
 const { generarGuion } = require('./services/guion');
 const { generarCaption } = require('./services/caption');
-const { generarAudio } = require('./services/audio');
-const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria } = require('./services/imagenes');
-const { generarVideo } = require('./services/video');
+const { generarAudio, resolverVozGoogle } = require('./services/audio');
+const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria, llamarOpenAIImagen, llamarGoogleImagen } = require('./services/imagenes');
+const { generarVideo, generarVideoImagenFija } = require('./services/video');
+const { generarGuionLargo, limpiarEtiquetas, planificar, PALABRAS_POR_MINUTO } = require('./services/guionLargo');
+const { generarAudioLargo, formatearTiempo } = require('./services/audioLargo');
 const { generarSubtitulos } = require('./services/subtitulos');
 const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = require('./services/telegram');
 const yt = require('./services/youtube');
@@ -27,17 +29,12 @@ crearCarpetas();
 const DIR_CURSO = path.join(__dirname, 'output', 'curso');
 fs.mkdirSync(DIR_CURSO, { recursive: true });
 
-// Voces Google TTS por idioma y género (espejo de services/audio.js)
-const CURSO_VOCES_GOOGLE = {
-  de: { masculino: 'de-DE-Neural2-B', femenino: 'de-DE-Neural2-A' },
-  en: { masculino: 'en-US-Neural2-D', femenino: 'en-US-Neural2-F' },
-  es: { masculino: 'es-US-Neural2-B', femenino: 'es-US-Neural2-A' },
-  fr: { masculino: 'fr-FR-Neural2-B', femenino: 'fr-FR-Neural2-A' },
-  pt: { masculino: 'pt-BR-Neural2-B', femenino: 'pt-BR-Neural2-A' },
-};
-const CURSO_LANG_CODE = {
-  de: 'de-DE', en: 'en-US', es: 'es-US', fr: 'fr-FR', pt: 'pt-BR',
-};
+// Directorio para el servicio de videos largos (idiomas, horizontal)
+const DIR_LARGO = path.join(__dirname, 'output', 'largo');
+fs.mkdirSync(DIR_LARGO, { recursive: true });
+const LARGO_MIN_MINUTOS = 3;
+const LARGO_MAX_MINUTOS = parseInt(process.env.LARGO_MAX_MINUTOS) || 30;
+
 const CURSO_LANG_NAMES = {
   de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
   fr: 'French (Français)', pt: 'Portuguese (Português)',
@@ -126,6 +123,8 @@ const sseClients = new Map();
 const pendingContinuar = new Map();
 // SSE clients del servicio de videos de curso
 const sseCursoClients = new Map();
+// SSE clients del servicio de videos largos
+const sseLargoClients = new Map();
 // SSE clients de la utilidad de imágenes
 const sseImgClients = new Map();
 // SSE clients de la utilidad de audio
@@ -861,33 +860,8 @@ Script to revise:
       // ── PASO 3: Audio con Google TTS ──────────────────────────────────────
       emit('progreso', { paso: 3, mensaje: `Sintetizando audio ${idioma} (${genero})...` });
 
-      const { GoogleAuth } = require('google-auth-library');
-      const auth = new GoogleAuth({
-        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-      });
-      const googleClient = await auth.getClient();
-      const { token } = await googleClient.getAccessToken();
-
-      const vocesIdioma = CURSO_VOCES_GOOGLE[idioma];
-      const nombreVoz   = vocesIdioma[genero];
-      const langCode    = CURSO_LANG_CODE[idioma];
-      const textoTts    = Buffer.byteLength(guion, 'utf8') > 4800 ? guion.slice(0, 4800) : guion;
-
-      const respTts = await require('axios').post(
-        'https://texttospeech.googleapis.com/v1/text:synthesize',
-        {
-          input: { text: textoTts },
-          voice: { languageCode: langCode, name: nombreVoz },
-          audioConfig: { audioEncoding: 'MP3' },
-        },
-        {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        }
-      );
-
-      const buffer = Buffer.from(respTts.data.audioContent, 'base64');
-      fs.writeFileSync(rutaMp3, buffer);
+      const { nombreVoz, langCode } = resolverVozGoogle(idioma, genero);
+      await generarAudio(guion, rutaMp3, genero, 'google', idioma);
       emit('audio_listo', { numero, rutaMp3: `/output/curso/audio${numero}.mp3`, nombreVoz, langCode });
       console.log(`[${ts()}] Curso: audio guardado en ${rutaMp3}`);
 
@@ -988,6 +962,193 @@ Script to revise:
       console.error(`[curso/generar] ERROR:`, mensaje);
       console.error(err?.stack || err);
       emit('pipeline_error', { mensaje });
+    }
+  })();
+});
+
+// ── GET /largo/config ──────────────────────────────────────────────────────────
+app.get('/largo/config', (req, res) => {
+  res.json({ minMinutos: LARGO_MIN_MINUTOS, maxMinutos: LARGO_MAX_MINUTOS, palabrasPorMinuto: PALABRAS_POR_MINUTO });
+});
+
+// ── GET /largo/archivos ───────────────────────────────────────────────────────
+app.get('/largo/archivos', (req, res) => {
+  const items = fs.readdirSync(DIR_LARGO)
+    .filter(f => /^largo-[0-9a-f-]+\.json$/.test(f))
+    .map(f => { try { return JSON.parse(fs.readFileSync(path.join(DIR_LARGO, f), 'utf-8')); } catch { return null; } })
+    .filter(Boolean)
+    .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  res.json(items.slice(0, 50));
+});
+
+// ── GET /largo/progreso/:id — SSE ─────────────────────────────────────────────
+app.get('/largo/progreso/:id', (req, res) => {
+  const { id } = req.params;
+  if (sseLargoClients.size >= seg.MAX_SSE_CLIENTES) {
+    return res.status(429).json({ error: 'Demasiadas conexiones activas.' });
+  }
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  sseLargoClients.set(id, res);
+  const hb = setInterval(() => { try { res.write(': hb\n\n'); } catch {} }, 20000);
+  req.on('close', () => { clearInterval(hb); sseLargoClients.delete(id); });
+});
+
+// ── POST /largo/generar — Guion por secciones + TTS troceado + video horizontal ─
+app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
+  const ts = () => new Date().toTimeString().slice(0, 8);
+  const tema     = seg.sanitizarTema(req.body.tema);
+  const idioma   = ['de', 'en', 'es', 'fr', 'pt'].includes(req.body.idioma) ? req.body.idioma : 'de';
+  const nivel    = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(req.body.nivel) ? req.body.nivel : 'B1';
+  const formato  = req.body.formato === 'dialogo' ? 'dialogo' : 'monologo';
+  const genero   = req.body.genero === 'femenino' ? 'femenino' : 'masculino';
+  const tts      = req.body.tts === 'openai' ? 'openai' : 'google';
+  const modo     = ['guion', 'audio', 'video'].includes(req.body.modo) ? req.body.modo : 'video';
+  const palabras = req.body.palabras ? String(req.body.palabras).trim().slice(0, 300) : '';
+  const minutosNum = parseInt(req.body.minutos);
+  const minutos  = Math.min(LARGO_MAX_MINUTOS, Math.max(LARGO_MIN_MINUTOS, isNaN(minutosNum) ? 10 : minutosNum));
+  const apiImagen = req.body.apiImagen === 'google' ? 'google' : 'openai';
+  const modeloImagen = apiImagen === 'google'
+    ? 'imagen-3.0-generate-002'
+    : (['gpt-image-1', 'gpt-image-1-mini'].includes(req.body.modeloImagen) ? req.body.modeloImagen : 'gpt-image-1-mini');
+
+  const subirYoutube = (req.body.subirYoutube === true || req.body.subirYoutube === 'true') && modo === 'video';
+  const privacidadYoutube = ['public', 'unlisted', 'private'].includes(req.body.privacidadYoutube)
+    ? req.body.privacidadYoutube : 'private';
+  let publicarYoutubeEn = null;
+  try {
+    publicarYoutubeEn = seg.validarFechaProgramada(req.body.publicarYoutubeEn);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+  let canalYoutube = null;
+  if (subirYoutube) {
+    const canal = yt.listarCanalesConfig().find(c => c.nombre === req.body.canalYoutube);
+    if (!canal) return res.status(400).json({ error: 'Canal de YouTube no encontrado en youtube-channels.json.' });
+    if (!canal.autorizado) return res.status(400).json({ error: `Canal "${canal.label}" no autorizado.` });
+    canalYoutube = canal.nombre;
+  }
+
+  if (!tema) return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
+
+  const id = 'largo-' + uuidv4();
+  res.json({ id, minutos, secciones: planificar(minutos).numSecciones });
+
+  (async () => {
+    const emit = (evento, datos) => {
+      const cliente = sseLargoClients.get(id);
+      if (cliente) try { cliente.write(`event: ${evento}\ndata: ${JSON.stringify(datos)}\n\n`); } catch {}
+    };
+    const dirTrabajo = path.join(DIR_LARGO, id);
+    const rutaTxt  = path.join(DIR_LARGO, `${id}.txt`);
+    const rutaMp3  = path.join(DIR_LARGO, `${id}.mp3`);
+    const rutaPng  = path.join(DIR_LARGO, `${id}.png`);
+    const rutaMp4  = path.join(DIR_LARGO, `${id}.mp4`);
+    const rutaMeta = path.join(DIR_LARGO, `${id}.json`);
+    const url = f => `/output/largo/${path.basename(f)}`;
+
+    try {
+      console.log(`[${ts()}] Largo ${id}: tema="${tema}" idioma=${idioma} nivel=${nivel} formato=${formato} minutos=${minutos} tts=${tts} modo=${modo}`);
+
+      // ── 1. Guion por secciones ───────────────────────────────────────────
+      emit('progreso', { paso: 1, mensaje: 'Diseñando el esquema de la lección...' });
+      const guion = await generarGuionLargo({ tema, idioma, nivel, minutos, formato, palabras }, async (ev) => {
+        if (ev.tipo === 'esquema') {
+          emit('esquema_listo', { titulo: ev.esquema.titulo, secciones: ev.esquema.secciones.map(s => s.titulo) });
+        } else {
+          emit('seccion_lista', { n: ev.indice + 1, total: ev.total, titulo: ev.seccion.titulo, palabras: ev.seccion.palabras });
+          console.log(`[${ts()}] Largo ${id}: sección ${ev.indice + 1}/${ev.total} (${ev.seccion.palabras} palabras)`);
+        }
+      });
+
+      const textoCompleto = `${guion.titulo}\n\n` + guion.secciones.map((s, i) => `## ${i + 1}. ${s.titulo}\n\n${s.texto}`).join('\n\n');
+      fs.writeFileSync(rutaTxt, textoCompleto, 'utf-8');
+      emit('guion_listo', {
+        titulo: guion.titulo,
+        palabras: guion.palabrasTotales,
+        palabrasObjetivo: guion.palabrasObjetivo,
+        minutosEstimados: +(guion.palabrasTotales / PALABRAS_POR_MINUTO).toFixed(1),
+        txt: url(rutaTxt),
+      });
+
+      const meta = {
+        id, fecha: new Date().toISOString(), tema, idioma, nivel, formato, tts, minutosSolicitados: minutos,
+        titulo: guion.titulo, palabras: guion.palabrasTotales, txt: url(rutaTxt),
+      };
+      const guardarMeta = () => fs.writeFileSync(rutaMeta, JSON.stringify(meta, null, 2), 'utf-8');
+      guardarMeta();
+
+      // ── 2. Audio troceado ───────────────────────────────────────────────
+      let capitulos = [];
+      if (modo !== 'guion') {
+        emit('progreso', { paso: 2, mensaje: `Sintetizando audio (${tts}, ${formato === 'dialogo' ? '2 voces' : 'voz ' + genero})...` });
+        const audio = await generarAudioLargo(guion.secciones, rutaMp3, { formato, genero, tts, idioma, dirTrabajo }, (hechos, total) => {
+          emit('audio_progreso', { hechos, total });
+        });
+        capitulos = audio.capitulos;
+        meta.mp3 = url(rutaMp3);
+        meta.duracion = Math.round(audio.duracionTotal);
+        meta.capitulos = capitulos.map(c => ({ titulo: c.titulo, inicio: formatearTiempo(c.inicio) }));
+        guardarMeta();
+        emit('audio_listo', { mp3: meta.mp3, duracion: meta.duracion, capitulos: meta.capitulos });
+        console.log(`[${ts()}] Largo ${id}: audio ${meta.duracion}s`);
+      }
+
+      // ── 3. Imagen + video horizontal ────────────────────────────────────
+      if (modo === 'video') {
+        emit('progreso', { paso: 3, mensaje: `Generando imagen de portada (${apiImagen})...` });
+        const langName = CURSO_LANG_NAMES[idioma];
+        const promptImg = `Clean, modern 16:9 cover illustration for an educational language-learning video titled "${guion.titulo}" (topic: ${tema}, level ${nivel}). Friendly, professional e-learning style, high contrast, uncluttered composition. Any visible text must be short, legible and written only in ${langName}.`;
+        const buffer = apiImagen === 'google'
+          ? await llamarGoogleImagen(promptImg, modeloImagen, '16:9')
+          : await llamarOpenAIImagen(promptImg, modeloImagen, 'high', '1536x1024');
+        fs.writeFileSync(rutaPng, buffer);
+        meta.png = url(rutaPng);
+        emit('imagen_lista', { png: meta.png });
+
+        emit('progreso', { paso: 4, mensaje: 'Renderizando video 1920×1080...' });
+        await generarVideoImagenFija(rutaMp3, rutaPng, rutaMp4);
+        meta.video = url(rutaMp4);
+        guardarMeta();
+        emit('video_listo', { video: meta.video });
+      }
+
+      // ── 4. YouTube (opcional, error no fatal) ───────────────────────────
+      if (subirYoutube) {
+        try {
+          emit('progreso', { paso: 5, mensaje: 'Generando metadatos y subiendo a YouTube...' });
+          const textoPlano = limpiarEtiquetas(guion.secciones.map(s => s.texto).join('\n'));
+          const ytMeta = await yt.generarMetadatosYoutube(tema, textoPlano, idioma, nivel, { esShort: false });
+          // YouTube rechaza '<' y '>' en título y descripción
+          const capitulosTxt = capitulos.map(c => `${formatearTiempo(c.inicio)} ${c.titulo}`).join('\n');
+          const resultado = await yt.subirVideo({
+            rutaVideo: rutaMp4,
+            titulo: ytMeta.titulo.replace(/[<>]/g, '').slice(0, 100),
+            descripcion: `${ytMeta.descripcion}\n\n${capitulosTxt}`.replace(/[<>]/g, '').slice(0, 4900),
+            tags: ytMeta.tags,
+            canal: canalYoutube,
+            privacidad: privacidadYoutube,
+            publicarEn: publicarYoutubeEn,
+          });
+          meta.youtubeUrl = resultado.url;
+          guardarMeta();
+          emit('youtube_listo', { url: resultado.url });
+        } catch (errYT) {
+          console.error(`[largo/generar] YouTube ERROR:`, errYT.message);
+          emit('youtube_error', { mensaje: errYT.message });
+        }
+      }
+
+      emit('finalizado', meta);
+      console.log(`[${ts()}] Largo ${id}: completado.`);
+    } catch (err) {
+      const mensaje = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message || String(err));
+      console.error(`[largo/generar] ERROR:`, mensaje);
+      emit('pipeline_error', { mensaje });
+    } finally {
+      fs.rm(dirTrabajo, { recursive: true, force: true }, () => {});
     }
   })();
 });

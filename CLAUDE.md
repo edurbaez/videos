@@ -92,6 +92,8 @@ El objeto `nichoConfig` que viaja por todo el pipeline tiene esta forma:
 | `services/video.js` | Renderizado FFmpeg 1080×1920 con xfade |
 | `services/telegram.js` | Envío de archivos y mensajes a Telegram |
 | `services/youtube.js` | Subida a YouTube (OAuth2 por canal, metadata GPT) |
+| `services/guionLargo.js` | Guion largo por secciones (esquema + sección a sección), monólogo o diálogo F/M |
+| `services/audioLargo.js` | TTS troceado (≤4000 bytes/pieza), une secciones con FFmpeg y calcula capítulos |
 | `utils/prompts.js` | `renderPrompt()` y `joinHashtags()` |
 | `utils/estilos.js` | Mapas de estilos/escenarios (ES → EN) para prompts |
 | `utils/archivos.js` | Rutas de output y creación de carpetas |
@@ -120,6 +122,9 @@ El objeto `nichoConfig` que viaja por todo el pipeline tiene esta forma:
 | `GET` | `/youtube/callback` | Callback OAuth2 de Google |
 | `POST` | `/curso/generar` | Genera audio/video para curso de idiomas |
 | `GET` | `/curso/archivos` | Lista archivos generados del curso |
+| `POST` | `/largo/generar` | Video largo horizontal de idiomas (3–`LARGO_MAX_MINUTOS` min, 1 o 2 voces) |
+| `GET` | `/largo/progreso/:id` | SSE del video largo |
+| `GET` | `/largo/archivos` | Lista videos largos generados (`output/largo/*.json`) |
 
 ---
 
@@ -164,6 +169,7 @@ FFMPEG_PATH
 PORT              (opcional, default 3000)
 API_KEY           (opcional — activa autenticación por header x-api-key)
 CORS_ORIGIN       (opcional — default http://localhost:PORT)
+LARGO_MAX_MINUTOS (opcional — duración máxima de videos largos, default 30)
 ```
 
 ---

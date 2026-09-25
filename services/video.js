@@ -196,4 +196,28 @@ async function generarVideo(rutaAudio, rutasImagenes, rutaDestino, rutaSRT = nul
   return rutaDestino;
 }
 
-module.exports = { generarVideo };
+/**
+ * Video horizontal con una sola imagen fija durante todo el audio.
+ */
+async function generarVideoImagenFija(rutaAudio, rutaImagen, rutaDestino, ancho = 1920, alto = 1080) {
+  const ts = () => new Date().toTimeString().slice(0, 8);
+  const duracion = await obtenerDuracionAudio(rutaAudio);
+  console.log(`[${ts()}] Video fijo: ${ancho}x${alto}, duración ${duracion.toFixed(1)}s`);
+
+  // Imagen estática: fps bajo + tune stillimage mantiene el render rápido en videos de 30+ min
+  await ejecutarFFmpeg([
+    '-loop', '1', '-framerate', '5', '-i', rutaImagen,
+    '-i', rutaAudio,
+    '-vf', `scale=${ancho}:${alto}:force_original_aspect_ratio=decrease,pad=${ancho}:${alto}:(ow-iw)/2:(oh-ih)/2:black,setsar=1`,
+    '-map', '0:v', '-map', '1:a',
+    '-c:v', 'libx264', '-tune', 'stillimage', '-preset', 'veryfast', '-crf', '23', '-r', '5',
+    '-c:a', 'aac', '-b:a', '192k',
+    '-pix_fmt', 'yuv420p',
+    '-t', duracion.toFixed(3),
+    '-movflags', '+faststart',
+    '-y', rutaDestino,
+  ]);
+  return rutaDestino;
+}
+
+module.exports = { generarVideo, generarVideoImagenFija, obtenerDuracionAudio, ejecutarFFmpeg };

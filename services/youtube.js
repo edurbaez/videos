@@ -105,8 +105,9 @@ async function gptMini(prompt, maxTokens = 200) {
   return resp.data.choices[0].message.content.trim();
 }
 
-async function generarMetadatosYoutube(tema, guion, idioma, nivel) {
+async function generarMetadatosYoutube(tema, guion, idioma, nivel, { esShort = true } = {}) {
   const langName  = LANG_NAMES[idioma] || idioma;
+  const tipoVideo = esShort ? 'short educational video' : 'long-form educational video';
   const extracto  = guion.slice(0, 300);
 
   const PROMPT_TITULO = `You are a YouTube SEO expert for educational content. Generate ONE optimized YouTube title.
@@ -124,7 +125,7 @@ Rules:
 - Clear and specific, educational tone, no clickbait
 - Output ONLY the title text, nothing else.`;
 
-  const PROMPT_DESCRIPCION = `You are a YouTube content creator for an educational channel. Write a bilingual YouTube description for a short educational video.
+  const PROMPT_DESCRIPCION = `You are a YouTube content creator for an educational channel. Write a bilingual YouTube description for a ${tipoVideo}.
 
 Context:
 - User topic / instruction: ${tema}
@@ -162,6 +163,7 @@ Rules:
   ]);
 
   const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean).slice(0, 14);
+  if (!esShort) return { titulo, descripcion, tags };
   tags.push('Shorts');
 
   // Añadir #Shorts al título para que YouTube lo clasifique como Short

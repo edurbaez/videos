@@ -112,10 +112,8 @@ Return a short, concrete list (3-5 items max) of the specific visual elements to
  * @param {string} quality      - Calidad: low | medium | high (default: medium)
  * @returns {Buffer} - Buffer de la imagen PNG
  */
-async function llamarOpenAIImagen(promptVisual, modelo = 'gpt-image-1', quality = 'medium') {
+async function llamarOpenAIImagen(promptVisual, modelo = 'gpt-image-1', quality = 'medium', size = '1024x1536') {
   validarModelo(modelo, 'openai');
-  // gpt-image-1 y gpt-image-1-mini usan 1024x1536 para portrait (9:16 aproximado)
-  const size = '1024x1536';
   let resp;
   try {
     resp = await axios.post(
@@ -211,7 +209,7 @@ async function obtenerAccessToken() {
  * Llama a Google Imagen via Vertex AI con service account.
  * Endpoint: https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{modelo}:predict
  */
-async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-002') {
+async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-002', aspectRatio = '9:16') {
   validarModelo(modelo, 'google');
   const project  = process.env.GOOGLE_PROJECT_ID;
   const location = process.env.GOOGLE_LOCATION || 'us-central1';
@@ -227,7 +225,7 @@ async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-00
         instances: [{ prompt: promptVisual }],
         parameters: {
           sampleCount: 1,
-          aspectRatio: '9:16',
+          aspectRatio,
           safetyFilterLevel: 'block_few',
           personGeneration: 'allow_adult',
         },
@@ -542,4 +540,4 @@ async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPr
   return rutas;
 }
 
-module.exports = { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria };
+module.exports = { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria, llamarOpenAIImagen, llamarGoogleImagen };
