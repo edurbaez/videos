@@ -8,7 +8,14 @@ const { renderPrompt } = require('../utils/prompts');
 const DIR_PROMPTS = path.join(__dirname, '..', 'prompts', 'largo');
 const ESCENAS_POR_LOTE = 12;
 const CONCURRENCIA_LOTES = 3;
-const CONCURRENCIA_IMAGENES = 3;
+// Spacing throttles the rate; concurrency only caps in-flight requests (each takes 15–40 s).
+const CONCURRENCIA_IMAGENES = 4;
+const segEntre = parseFloat(process.env.LARGO_SEGUNDOS_ENTRE_IMAGENES);
+const MS_ENTRE_IMAGENES = (isNaN(segEntre) ? 10 : Math.min(60, Math.max(0, segEntre))) * 1000;
+const INTENTOS_IMAGEN = 5;
+const BACKOFF_BASE_MS = 15000;
+const BACKOFF_MAX_MS = 90000;
+const PAUSA_RESCATE_MS = 60000;
 const MAX_CHARS_TEXTO = 60;
 // Por debajo de esta fracción del objetivo, la última escena de una sección se funde con la anterior
 const FRACCION_MINIMA = 0.4;
@@ -129,31 +136,75 @@ Scene: ${escena.prompt}
 Strict rules: absolutely no text, letters, words, numbers, labels or logos anywhere in the image. Horizontal 16:9 composition. Keep the bottom fifth of the frame visually calm, a caption will be overlaid there.`;
 }
 
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+// Image APIs enforce per-minute quotas (429); retrying immediately just hits the same wall.
+function esTransitorio(err) {
+  const m = err.message || '';
+  return /HTTP (429|5\d\d|undefined)/.test(m) || /rate|quota|timeout|ECONN|ETIMEDOUT|socket/i.test(m);
+}
+
+function esBloqueoContenido(err) {
+  return /filtro de seguridad|moderation|safety|content_policy/i.test(err.message || '');
+}
+
+async function generarEscena(e, guia, generar, ruta) {
+  let prompt = componerPrompt(guia, e);
+  for (let intento = 1; intento <= INTENTOS_IMAGEN; intento++) {
+    try {
+      fs.writeFileSync(ruta, await generar(prompt));
+      e.imagen = ruta;
+      delete e.errorImagen;
+      return;
+    } catch (err) {
+      e.errorImagen = err.message.slice(0, 300);
+      console.error(`[escenasLargo] escena ${e.n} intento ${intento}: ${err.message}`);
+      if (esBloqueoContenido(err)) {
+        // Fall back to the style guide alone: the scene prompt is what usually trips the filter.
+        prompt = `${guia.estilo}\n\nScene: a calm, neutral classroom or study setting that fits the lesson mood.\n\nNo text, letters or logos. Horizontal 16:9 composition.`;
+      } else if (!esTransitorio(err)) {
+        return;
+      }
+      if (intento < INTENTOS_IMAGEN) {
+        const base = esTransitorio(err) ? BACKOFF_BASE_MS * 2 ** (intento - 1) : 2000;
+        await esperar(Math.min(base, BACKOFF_MAX_MS) + Math.random() * 3000);
+      }
+    }
+  }
+}
+
 /**
- * Genera una imagen por escena. Un fallo tras reintento reutiliza la imagen vecina
- * para no perder un video de 30 min por una sola escena.
+ * Genera una imagen por escena con backoff ante límites de cuota y una pasada de rescate
+ * secuencial para las fallidas. Lo que siga fallando reutiliza la imagen vecina.
  */
 async function generarImagenesEscenas(escenas, guia, { apiImagen, modeloImagen, dir }, onProgreso) {
   fs.mkdirSync(dir, { recursive: true });
-  const generar = prompt => apiImagen === 'google'
-    ? llamarGoogleImagen(prompt, modeloImagen, '16:9')
-    : llamarOpenAIImagen(prompt, modeloImagen, 'medium', '1536x1024');
+  // Reserves start slots synchronously, so concurrent workers and retries share one timeline.
+  let proximoInicio = 0;
+  const generar = async prompt => {
+    const ahora = Date.now();
+    const inicio = Math.max(ahora, proximoInicio);
+    proximoInicio = inicio + MS_ENTRE_IMAGENES;
+    if (inicio > ahora) await esperar(inicio - ahora);
+    return apiImagen === 'google'
+      ? llamarGoogleImagen(prompt, modeloImagen, '16:9')
+      : llamarOpenAIImagen(prompt, modeloImagen, 'medium', '1536x1024');
+  };
+  const rutaDe = e => path.join(dir, `escena-${String(e.n).padStart(3, '0')}.png`);
 
   let hechos = 0;
   await ejecutarConLimite(escenas.map(e => async () => {
-    const prompt = componerPrompt(guia, e);
-    const ruta = path.join(dir, `escena-${String(e.n).padStart(3, '0')}.png`);
-    for (let intento = 1; intento <= 2 && !e.imagen; intento++) {
-      try {
-        fs.writeFileSync(ruta, await generar(prompt));
-        e.imagen = ruta;
-      } catch (err) {
-        console.error(`[escenasLargo] escena ${e.n} intento ${intento}: ${err.message}`);
-      }
-    }
+    await generarEscena(e, guia, generar, rutaDe(e));
     hechos++;
     if (onProgreso) onProgreso(hechos, escenas.length);
   }), CONCURRENCIA_IMAGENES);
+
+  const pendientes = escenas.filter(e => !e.imagen);
+  if (pendientes.length) {
+    console.warn(`[escenasLargo] rescate: ${pendientes.length} escenas fallidas, reintentando en serie`);
+    await esperar(PAUSA_RESCATE_MS);
+    for (const e of pendientes) await generarEscena(e, guia, generar, rutaDe(e));
+  }
 
   const conImagen = escenas.filter(e => e.imagen);
   if (!conImagen.length) throw new Error('No se pudo generar ninguna imagen de escena.');

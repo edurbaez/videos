@@ -1125,20 +1125,21 @@ app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
           emit('imagenes_progreso', { hechos, total });
         });
         const reutilizadas = escenas.filter(e => e.imagenReutilizada).length;
-        if (reutilizadas) console.warn(`[${ts()}] Largo ${id}: ${reutilizadas} escenas reutilizan imagen vecina por fallo`);
+        const errorImagen = escenas.find(e => e.imagenReutilizada)?.errorImagen;
+        if (reutilizadas) console.warn(`[${ts()}] Largo ${id}: ${reutilizadas} escenas reutilizan imagen vecina por fallo. Último error: ${errorImagen}`);
 
         fs.writeFileSync(rutaEscenas, JSON.stringify({
           segundosPorImagen,
           guia,
           escenas: escenas.map(e => ({
             n: e.n, inicio: +e.inicio.toFixed(2), fin: +e.fin.toFixed(2), textoPantalla: e.textoPantalla,
-            prompt: e.prompt, imagen: url(e.imagen), reutilizada: !!e.imagenReutilizada, texto: e.texto,
+            prompt: e.prompt, imagen: url(e.imagen), reutilizada: !!e.imagenReutilizada, errorImagen: e.errorImagen, texto: e.texto,
           })),
         }, null, 2), 'utf-8');
         meta.png = url(escenas[0].imagen);
         meta.escenas = url(rutaEscenas);
         meta.numImagenes = escenas.length;
-        emit('imagen_lista', { png: meta.png, total: escenas.length, reutilizadas });
+        emit('imagen_lista', { png: meta.png, total: escenas.length, reutilizadas, errorImagen });
 
         emit('progreso', { paso: 5, mensaje: 'Renderizando video 1920×1080...' });
         const conTexto = escribirAss(escenas, rutaAss);

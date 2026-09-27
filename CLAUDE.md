@@ -172,6 +172,7 @@ API_KEY           (opcional — activa autenticación por header x-api-key)
 CORS_ORIGIN       (opcional — default http://localhost:PORT)
 LARGO_MAX_MINUTOS (opcional — duración máxima de videos largos, default 30)
 LARGO_SEGUNDOS_POR_IMAGEN (opcional — default de segundos por imagen en videos largos, 10–120, default 30)
+LARGO_SEGUNDOS_ENTRE_IMAGENES (opcional — separación mínima entre peticiones de imagen en videos largos para no pasar la cuota por minuto, 0–60, default 10)
 ```
 
 ---
