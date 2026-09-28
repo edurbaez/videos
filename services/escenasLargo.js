@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const { chat, LANG_NAMES } = require('./guionLargo');
+const { chat } = require('./guionLargo');
+const { LANG_NAMES, MS_ENTRE_IMAGENES } = require('../utils/constantes');
+const { ejecutarConLimite, crearLimitadorTiempo, esperar } = require('../utils/concurrencia');
 const { llamarOpenAIImagen, llamarGoogleImagen } = require('./imagenes');
 const { renderPrompt } = require('../utils/prompts');
 
@@ -10,8 +12,6 @@ const ESCENAS_POR_LOTE = 12;
 const CONCURRENCIA_LOTES = 3;
 // Spacing throttles the rate; concurrency only caps in-flight requests (each takes 15–40 s).
 const CONCURRENCIA_IMAGENES = 4;
-const segEntre = parseFloat(process.env.LARGO_SEGUNDOS_ENTRE_IMAGENES);
-const MS_ENTRE_IMAGENES = (isNaN(segEntre) ? 10 : Math.min(60, Math.max(0, segEntre))) * 1000;
 const INTENTOS_IMAGEN = 5;
 const BACKOFF_BASE_MS = 15000;
 const BACKOFF_MAX_MS = 90000;
@@ -27,17 +27,6 @@ const FORMATOS = {
 const formatoDe = orientacion => FORMATOS[orientacion] || FORMATOS.horizontal;
 
 const leerPrompt = nombre => fs.readFileSync(path.join(DIR_PROMPTS, nombre), 'utf-8');
-
-async function ejecutarConLimite(tareas, limite) {
-  let siguiente = 0;
-  const trabajadores = Array.from({ length: Math.min(limite, tareas.length) }, async () => {
-    while (siguiente < tareas.length) {
-      const i = siguiente++;
-      await tareas[i]();
-    }
-  });
-  await Promise.all(trabajadores);
-}
 
 /**
  * Agrupa la línea de tiempo por oraciones en escenas de ~segundosObjetivo sin cruzar secciones.
@@ -142,8 +131,6 @@ Scene: ${escena.prompt}
 Strict rules: absolutely no text, letters, words, numbers, labels or logos anywhere in the image. ${formatoDe(orientacion).composicion} Keep the bottom fifth of the frame visually calm, a caption will be overlaid there.`;
 }
 
-const esperar = ms => new Promise(r => setTimeout(r, ms));
-
 // Image APIs enforce per-minute quotas (429); retrying immediately just hits the same wall.
 function esTransitorio(err) {
   const m = err.message || '';
@@ -186,13 +173,9 @@ async function generarEscena(e, guia, generar, ruta, orientacion) {
 async function generarImagenesEscenas(escenas, guia, { apiImagen, modeloImagen, dir, orientacion, calidad = 'medium' }, onProgreso) {
   const formato = formatoDe(orientacion);
   fs.mkdirSync(dir, { recursive: true });
-  // Reserves start slots synchronously, so concurrent workers and retries share one timeline.
-  let proximoInicio = 0;
+  const turno = crearLimitadorTiempo(MS_ENTRE_IMAGENES);
   const generar = async prompt => {
-    const ahora = Date.now();
-    const inicio = Math.max(ahora, proximoInicio);
-    proximoInicio = inicio + MS_ENTRE_IMAGENES;
-    if (inicio > ahora) await esperar(inicio - ahora);
+    await turno();
     return apiImagen === 'google'
       ? llamarGoogleImagen(prompt, modeloImagen, formato.google)
       : llamarOpenAIImagen(prompt, modeloImagen, calidad, formato.openai);

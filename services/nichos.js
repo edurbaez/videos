@@ -2,14 +2,24 @@ const fs = require('fs');
 const path = require('path');
 
 const RUTA_NICHOS = path.join(__dirname, '..', 'nichos');
+const RE_ID_NICHO = /^[a-zA-Z0-9_-]+$/;
 
+// Optional files (null when missing): youtube* fall back to the built-in prompts in services/youtube.js,
+// imagenesBloque to prompts/shorts/imagenes-bloque.txt
 const PROMPTS_ARCHIVOS = {
-  guionBorrador: 'prompt-guion-borrador.txt',
-  guionMejora:   'prompt-guion-mejora.txt',
-  caption:       'prompt-caption.txt',
-  imagenes:      'prompt-imagenes.txt',
-  storyboard:    'prompt-storyboard.txt',
+  guionBorrador:      'prompt-guion-borrador.txt',
+  guionMejora:        'prompt-guion-mejora.txt',
+  caption:            'prompt-caption.txt',
+  imagenes:           'prompt-imagenes.txt',
+  storyboard:         'prompt-storyboard.txt',
+  imagenesBloque:     'prompt-imagenes-bloque.txt',
+  youtubeTitulo:      'prompt-youtube-titulo.txt',
+  youtubeDescripcion: 'prompt-youtube-descripcion.txt',
+  youtubeTags:        'prompt-youtube-tags.txt',
 };
+
+// id -> { firma, nicho }; invalidated when any file's mtime/size changes
+const cache = new Map();
 
 /**
  * Devuelve un array con los nichos disponibles (id + nombre + descripcion + defaults).
@@ -20,7 +30,7 @@ function listarNichos() {
   if (!fs.existsSync(RUTA_NICHOS)) return [];
 
   return fs.readdirSync(RUTA_NICHOS, { withFileTypes: true })
-    .filter(d => d.isDirectory())
+    .filter(d => d.isDirectory() && RE_ID_NICHO.test(d.name))
     .map(d => {
       const rutaConfig = path.join(RUTA_NICHOS, d.name, 'config.json');
       if (!fs.existsSync(rutaConfig)) return null;
@@ -39,32 +49,31 @@ function listarNichos() {
     .filter(Boolean);
 }
 
-/**
- * Carga un nicho completo por su id: config + todos los prompts.
- * Lanza un error si el nicho no existe o el config.json es inválido.
- *
- * @param {string} id - Identificador del nicho (nombre de la carpeta)
- * @returns {object} Objeto nicho con config y prompts listos para usar
- */
-function cargarNicho(id) {
-  // Validar formato: solo letras, números, guiones y guiones bajos.
-  // Bloquea path traversal como "../../../etc/passwd" antes de tocar el FS.
-  if (!id || typeof id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+/** Resolves and validates the niche folder (blocks path traversal before touching the FS). */
+function rutaDeNicho(id) {
+  if (!id || typeof id !== 'string' || !RE_ID_NICHO.test(id)) {
     throw new Error(`Nicho "${id}" inválido.`);
   }
-
   const rutaNicho = path.join(RUTA_NICHOS, id);
-
-  // Segunda capa: el path resuelto debe estar dentro de RUTA_NICHOS.
-  // Evita bypasses con unicode o combinaciones de separadores.
+  // Second layer: the resolved path must stay inside RUTA_NICHOS
   if (!path.resolve(rutaNicho).startsWith(path.resolve(RUTA_NICHOS) + path.sep)) {
     throw new Error(`Nicho "${id}" inválido.`);
   }
+  return rutaNicho;
+}
 
-  if (!fs.existsSync(rutaNicho)) {
-    throw new Error(`Nicho "${id}" no encontrado. Nichos disponibles: ${listarNichos().map(n => n.id).join(', ')}`);
-  }
+function firmaArchivos(rutaNicho) {
+  return ['config.json', ...Object.values(PROMPTS_ARCHIVOS)].map(archivo => {
+    try {
+      const st = fs.statSync(path.join(rutaNicho, archivo));
+      return `${st.mtimeMs}:${st.size}`;
+    } catch {
+      return '-';
+    }
+  }).join('|');
+}
 
+function leerNicho(id, rutaNicho) {
   const rutaConfig = path.join(rutaNicho, 'config.json');
   if (!fs.existsSync(rutaConfig)) {
     throw new Error(`Nicho "${id}" no tiene config.json.`);
@@ -77,7 +86,6 @@ function cargarNicho(id) {
     throw new Error(`config.json del nicho "${id}" es inválido: ${e.message}`);
   }
 
-  // Cargar prompts — si un archivo no existe, el campo queda como null
   const prompts = {};
   for (const [clave, archivo] of Object.entries(PROMPTS_ARCHIVOS)) {
     const rutaPrompt = path.join(rutaNicho, archivo);
@@ -95,8 +103,35 @@ function cargarNicho(id) {
     guion:       config.guion       || {},
     caption:     config.caption     || {},
     imagenes:    config.imagenes    || {},
+    automatizacion: config.automatizacion || {},
+    youtube:     config.youtube     || {},
     prompts,
   };
 }
 
-module.exports = { listarNichos, cargarNicho };
+/**
+ * Carga un nicho completo por su id: config + todos los prompts.
+ * Lanza un error si el nicho no existe o el config.json es inválido.
+ * Cached in memory and re-read only when a file of the niche changes (mtime/size);
+ * returns a copy because callers may mutate it (e.g. /util/audio overrides idioma).
+ *
+ * @param {string} id - Identificador del nicho (nombre de la carpeta)
+ * @returns {object} Objeto nicho con config y prompts listos para usar
+ */
+function cargarNicho(id) {
+  const rutaNicho = rutaDeNicho(id);
+  if (!fs.existsSync(rutaNicho)) {
+    cache.delete(id);
+    throw new Error(`Nicho "${id}" no encontrado. Nichos disponibles: ${listarNichos().map(n => n.id).join(', ')}`);
+  }
+
+  const firma = firmaArchivos(rutaNicho);
+  let entrada = cache.get(id);
+  if (!entrada || entrada.firma !== firma) {
+    entrada = { firma, nicho: leerNicho(id, rutaNicho) };
+    cache.set(id, entrada);
+  }
+  return structuredClone(entrada.nicho);
+}
+
+module.exports = { listarNichos, cargarNicho, PROMPTS_ARCHIVOS };

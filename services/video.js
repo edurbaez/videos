@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-require('dotenv').config();
+const { ts } = require('../utils/log');
 
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
 const FFPROBE = FFMPEG.replace('ffmpeg.exe', 'ffprobe.exe').replace(/ffmpeg$/, 'ffprobe');
@@ -46,7 +46,6 @@ function obtenerDuracionAudio(rutaAudio) {
  * @returns {Promise<void>}
  */
 function ejecutarFFmpeg(args) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   return new Promise((resolve, reject) => {
     console.log(`[${ts()}] FFmpeg: iniciando comando...`);
     const proc = spawn(FFMPEG, args);
@@ -107,7 +106,6 @@ function escaparRutaSRT(ruta) {
  * @returns {string} - Ruta del video generado
  */
 async function generarVideo(rutaAudio, rutasImagenes, rutaDestino, rutaSRT = null) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const n = rutasImagenes.length;
   const FADE_DURATION = 0.5;
 
@@ -204,7 +202,6 @@ async function generarVideo(rutaAudio, rutasImagenes, rutaDestino, rutaSRT = nul
  * @param {object[]} escenas - [{ imagen, inicio, fin }] contiguas y ordenadas
  */
 async function generarVideoEscenas(rutaAudio, escenas, rutaDestino, { rutaAss = null, dirTrabajo, ancho = 1920, alto = 1080 } = {}) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const duracion = await obtenerDuracionAudio(rutaAudio);
   console.log(`[${ts()}] Video escenas: ${escenas.length} imágenes, duración ${duracion.toFixed(1)}s`);
 

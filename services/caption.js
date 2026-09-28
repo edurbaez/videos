@@ -1,6 +1,5 @@
-const axios = require('axios');
-require('dotenv').config();
-
+const { chat } = require('./openai');
+const { ts } = require('../utils/log');
 const { renderPrompt, joinHashtags } = require('../utils/prompts');
 
 /**
@@ -11,7 +10,6 @@ const { renderPrompt, joinHashtags } = require('../utils/prompts');
  * @returns {string} - Caption listo para copiar y pegar
  */
 async function generarCaption(guion, nichoConfig) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   console.log(`[${ts()}] Caption: generando con GPT-4o-mini (nicho: ${nichoConfig.id})...`);
 
   const prompt = renderPrompt(nichoConfig.prompts.caption, {
@@ -23,22 +21,7 @@ async function generarCaption(guion, nichoConfig) {
     hashtags_base:  joinHashtags(nichoConfig.caption.hashtagsBase),
   });
 
-  const resp = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  const caption = resp.data.choices[0].message.content.trim();
+  const caption = await chat({ model: 'gpt-4o-mini', prompt, temperature: 0.7 });
   console.log(`[${ts()}] Caption: generado correctamente.`);
   return caption;
 }

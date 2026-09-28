@@ -2,20 +2,30 @@ const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
 const path = require('path');
-const { execSync } = require('child_process');
-const { GoogleAuth } = require('google-auth-library');
-require('dotenv').config();
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 
 const TIMEOUT_IMAGEN_MS = 180_000;
 
-const { rutaImagen } = require('../utils/archivos');
+const { rutaImagen, urlImagen, DIR_IMAGENES } = require('../utils/archivos');
+const { ts } = require('../utils/log');
+const { chat } = require('./openai');
+const { obtenerAccessToken } = require('./googleAuth');
 const { ESTILOS_ES, ESTILOS_EN, ESCENARIOS_EN } = require('../utils/estilos');
 const { generarStoryboard } = require('./storyboard');
-const { renderPrompt } = require('../utils/prompts');
+const { renderPrompt, leerPromptArchivo } = require('../utils/prompts');
+const { ejecutarConLimite, crearLimitadorTiempo, esperar } = require('../utils/concurrencia');
+const { MS_ENTRE_IMAGENES } = require('../utils/constantes');
 const { validarModelo, MODELO_IMAGEN_OPENAI_DEFAULT } = require('../middleware/seguridad');
 
-// Galería en memoria: persiste mientras el servidor esté corriendo
+// Galería en memoria: persiste mientras el servidor esté corriendo (FIFO acotada)
+const MAX_GALERIA = 200;
 const galeria = [];
+
+function agregarAGaleria(entrada) {
+  galeria.push({ ...entrada, fecha: new Date().toISOString() });
+  if (galeria.length > MAX_GALERIA) galeria.splice(0, galeria.length - MAX_GALERIA);
+}
 
 /**
  * Devuelve una copia de la galería completa.
@@ -48,21 +58,7 @@ async function generarPromptVisual(guion, n, total, estilo = 'cinematico', escen
     escenario_en:     escenarioEN,
   });
 
-  const resp = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content }],
-      temperature: 0.9,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-  return resp.data.choices[0].message.content.trim();
+  return chat({ model: 'gpt-4o-mini', prompt: content, temperature: 0.9 });
 }
 
 /**
@@ -158,19 +154,6 @@ async function llamarOpenAIImagenEdits(promptVisual, refImagePath, modelo = MODE
 }
 
 /**
- * Obtiene un access token de OAuth2 usando el service account configurado.
- */
-async function obtenerAccessToken() {
-  const auth = new GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-  });
-  const client = await auth.getClient();
-  const tokenResp = await client.getAccessToken();
-  return tokenResp.token;
-}
-
-/**
  * Llama a Google Imagen via Vertex AI con service account.
  * Endpoint: https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{modelo}:predict
  */
@@ -223,7 +206,6 @@ async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-00
  * Soporta api='google' o api='openai'.
  */
 async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCadaImagen, refImagePath = null, quality = 'medium') {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const rutas = [];
   const prompts = Array.isArray(prompt) ? prompt : null;
 
@@ -231,7 +213,7 @@ async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCada
     const n = i + 1;
     const promptActual = prompts ? (prompts[i] || prompts[prompts.length - 1]) : prompt;
     const ruta = rutaImagen(id, n);
-    const urlPublica = `/output/imagenes/imagen-${id}-${n}.png`;
+    const urlPublica = urlImagen(id, n);
 
     const modoRef = refImagePath && api !== 'google' ? ' +ref' : '';
     console.log(`[${ts()}] Imagen directa ${n}/${cantidad}: api=${api} modelo=${modelo}${modoRef}...`);
@@ -248,7 +230,7 @@ async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCada
           buffer = await llamarOpenAIImagen(promptActual, modelo, quality);
         }
         fs.writeFileSync(ruta, buffer);
-        galeria.push({ id, numero: n, ruta, urlPublica, prompt: promptActual, fecha: new Date().toISOString() });
+        agregarAGaleria({ id, numero: n, ruta, urlPublica, prompt: promptActual });
         guardada = true;
         break;
       } catch (err) {
@@ -258,8 +240,8 @@ async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCada
 
     if (!guardada) {
       console.error(`[${ts()}] Imagen ${n}/${cantidad}: usando placeholder negro.`);
-      crearPlaceholder(ruta);
-      galeria.push({ id, numero: n, ruta, urlPublica, prompt: null, fecha: new Date().toISOString() });
+      await crearPlaceholder(ruta);
+      agregarAGaleria({ id, numero: n, ruta, urlPublica, prompt: null });
     }
 
     rutas.push(ruta);
@@ -269,39 +251,78 @@ async function generarImagenesDirectas(prompt, cantidad, id, modelo, api, onCada
   return rutas;
 }
 
-/**
- * Crea una imagen placeholder negra de 1080x1920 usando FFmpeg.
- * Se usa como fallback cuando Gemini falla dos veces seguidas.
- *
- * @param {string} ruta - Ruta donde guardar la imagen placeholder
- */
-function crearPlaceholder(ruta) {
-  const ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg';
-  execSync(
-    `"${ffmpeg}" -f lavfi -i color=black:size=1080x1920:rate=1 -frames:v 1 -y "${ruta}"`,
-    { stdio: 'ignore' }
-  );
+const RUTA_PLACEHOLDER_BASE = path.join(DIR_IMAGENES, '_placeholder-1080x1920.png');
+let placeholderBase = null;
+
+/** Renders the black 1080x1920 PNG once (async FFmpeg) and memoizes it. */
+function obtenerPlaceholderBase() {
+  if (!placeholderBase) {
+    placeholderBase = (async () => {
+      if (fs.existsSync(RUTA_PLACEHOLDER_BASE)) return RUTA_PLACEHOLDER_BASE;
+      const ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg';
+      const tmp = `${RUTA_PLACEHOLDER_BASE}.${process.pid}.tmp.png`;
+      await promisify(execFile)(ffmpeg, ['-f', 'lavfi', '-i', 'color=black:size=1080x1920:rate=1', '-frames:v', '1', '-y', tmp]);
+      await fs.promises.rename(tmp, RUTA_PLACEHOLDER_BASE);
+      return RUTA_PLACEHOLDER_BASE;
+    })().catch(err => { placeholderBase = null; throw err; });
+  }
+  return placeholderBase;
 }
 
 /**
- * Genera todas las imágenes del video de forma secuencial.
+ * Copia el placeholder negro de 1080x1920 a `ruta`.
+ * Se usa como fallback cuando la API de imágenes falla dos veces seguidas.
+ */
+async function crearPlaceholder(ruta) {
+  try {
+    await fs.promises.copyFile(await obtenerPlaceholderBase(), ruta);
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+    // Base was deleted from disk (e.g. output cleanup) after being memoized: regenerate once
+    placeholderBase = null;
+    await fs.promises.copyFile(await obtenerPlaceholderBase(), ruta);
+  }
+}
+
+const CONCURRENCIA_IMAGENES = { openai: 3, google: 2 };
+const PAUSA_REINTENTO_429_MS = 35_000;
+const PAUSA_REINTENTO_MS = 4000;
+
+/**
+ * Genera todas las imágenes de un short.
  * Para cada imagen: genera prompt (o usa el del storyboard) → llama a la API de imágenes → guarda PNG.
  * Si la API falla, reintenta una vez. Si falla de nuevo, usa placeholder negro.
  *
- * Consistencia de personaje: si no se pasa `refImagePath` (referencia manual del usuario)
- * y la API es OpenAI, la primera imagen generada con éxito se fija como referencia
- * automática (`/v1/images/edits`) para las escenas siguientes del mismo video.
+ * Paralelismo: concurrencia limitada (CONCURRENCIA_IMAGENES) más un limitador por tiempo
+ * (MS_ENTRE_IMAGENES) compartido por workers y reintentos. El resultado mantiene el orden 1..N.
  *
- * @param {string} guion    - Texto del guion mejorado
- * @param {number} cantidad - Número de imágenes a generar
- * @param {string} id       - UUID de la generación
- * @returns {string[]} - Array de rutas absolutas de las imágenes generadas
+ * Consistencia de personaje: sin `refImagePath` (referencia manual) y con OpenAI, se genera en serie
+ * hasta que una imagen sale bien; esa queda como referencia automática (`/v1/images/edits`) y el
+ * resto se genera en paralelo con ella.
+ *
+ * @param {object} o
+ * @param {string} o.guion
+ * @param {number} o.cantidad
+ * @param {string} o.id              - UUID de la generación
+ * @param {object} o.nichoConfig     - cargarNicho() result
+ * @param {string} o.modelo
+ * @param {'openai'|'google'} [o.api='openai']
+ * @param {string} [o.estilo='cinematico']
+ * @param {string} [o.escenario='ninguno']
+ * @param {string|null} [o.refImagePath=null]
+ * @param {string} [o.quality='medium']
+ * @param {(n: number, prompt: string) => void} [o.onPrompt]
+ * @param {(escenas: object[]) => void} [o.onStoryboard]
+ * @param {(n: number, mensaje: string) => void} [o.onErrorImagen]
+ * @returns {Promise<string[]>} rutas absolutas en orden
  */
-async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, onErrorImagen = null, nichoConfig, refImagePath = null, quality = 'medium') {
-  const ts = () => new Date().toTimeString().slice(0, 8);
+async function generarImagenes({
+  guion, cantidad, id, nichoConfig, modelo, api = 'openai', estilo = 'cinematico', escenario = 'ninguno',
+  refImagePath = null, quality = 'medium', onPrompt = null, onStoryboard = null, onErrorImagen = null,
+}) {
   console.log(`[${ts()}] Imagenes: generando ${cantidad} imágenes para id ${id} (api=${api} modelo=${modelo} estilo=${estilo} escenario=${escenario} nicho=${nichoConfig.id})...`);
 
-  // Generar storyboard cuando hay más de una imagen para que los prompts sean una secuencia narrativa
+  // Storyboard when there is more than one image so the prompts form a narrative sequence
   let storyboardPrompts = null;
   if (cantidad > 1) {
     console.log(`[${ts()}] Imagenes: generando storyboard para ${cantidad} escenas...`);
@@ -315,47 +336,41 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
     }
   }
 
-  const rutas = [];
-  // Ancla de consistencia: si no hay refImagePath del usuario, la primera imagen
-  // generada se usa como referencia (edits) para las siguientes escenas del mismo video.
+  const rutas = Array.from({ length: cantidad }, (_, i) => rutaImagen(id, i + 1));
+  const turno = crearLimitadorTiempo(MS_ENTRE_IMAGENES);
   let refAuto = null;
 
-  for (let i = 0; i < cantidad; i++) {
-    const n = i + 1;
-    const ruta = rutaImagen(id, n);
-    const urlPublica = `/output/imagenes/imagen-${id}-${n}.png`;
-    const refActual = refImagePath || refAuto;
+  const usarPlaceholder = async (n, mensaje) => {
+    console.error(`[${ts()}] Imagen ${n}/${cantidad}: usando placeholder negro.`);
+    await crearPlaceholder(rutas[n - 1]);
+    agregarAGaleria({ id, numero: n, ruta: rutas[n - 1], urlPublica: urlImagen(id, n), prompt: null });
+    if (onErrorImagen) onErrorImagen(n, mensaje);
+  };
+
+  /** Generates image n; resolves true if a real image was saved. */
+  async function generarUna(n) {
+    const ruta = rutas[n - 1];
+    const refActual = api === 'google' ? null : (refImagePath || refAuto);
 
     let promptVisual;
     if (storyboardPrompts) {
       promptVisual = storyboardPrompts[n - 1];
-      if (onPrompt) onPrompt(n, promptVisual);
-      console.log(`[${ts()}] Imagen ${n}/${cantidad}: usando prompt de storyboard → llamando ${api}/${modelo}${refActual ? ' (con referencia para consistencia)' : ''}...`);
     } else {
-      console.log(`[${ts()}] Imagen ${n}/${cantidad}: generando prompt visual...`);
       try {
         promptVisual = await generarPromptVisual(guion, n, cantidad, estilo, escenario, nichoConfig);
-        if (onPrompt) onPrompt(n, promptVisual);
-        console.log(`[${ts()}] Imagen ${n}/${cantidad}: prompt listo → llamando ${api}/${modelo}...`);
       } catch (err) {
         console.error(`[${ts()}] Imagen ${n}/${cantidad}: error generando prompt: ${err.message}`);
-        crearPlaceholder(ruta);
-        galeria.push({ id, numero: n, ruta, urlPublica, prompt: null, fecha: new Date().toISOString() });
-        rutas.push(ruta);
-        continue;
+        await usarPlaceholder(n, err.message);
+        return false;
       }
     }
+    if (onPrompt) onPrompt(n, promptVisual);
+    console.log(`[${ts()}] Imagen ${n}/${cantidad}: llamando ${api}/${modelo}${refActual ? ' (con referencia para consistencia)' : ''}...`);
 
-    // Pausa preventiva entre imágenes para Google (cuota ~2 req/min por defecto)
-    if (api === 'google' && n > 1) {
-      console.log(`[${ts()}] Imagen ${n}/${cantidad}: esperando 35s para respetar cuota de Google...`);
-      await new Promise(r => setTimeout(r, 35000));
-    }
-
-    let guardada = false;
     let ultimoError = '';
     for (let intento = 1; intento <= 2; intento++) {
       try {
+        await turno();
         let buffer;
         if (api === 'google') {
           buffer = await llamarGoogleImagen(promptVisual, modelo);
@@ -364,35 +379,34 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
         } else {
           buffer = await llamarOpenAIImagen(promptVisual, modelo, quality);
         }
-        fs.writeFileSync(ruta, buffer);
+        await fs.promises.writeFile(ruta, buffer);
         console.log(`[${ts()}] Imagen ${n}/${cantidad}: guardada (intento ${intento})`);
-        galeria.push({ id, numero: n, ruta, urlPublica, prompt: promptVisual, fecha: new Date().toISOString() });
-        guardada = true;
-        // Fija la primera imagen generada como referencia automática para las siguientes,
-        // solo si el usuario no aportó su propia referencia y la API la soporta.
-        if (!refImagePath && !refAuto && api !== 'google') refAuto = ruta;
-        break;
+        agregarAGaleria({ id, numero: n, ruta, urlPublica: urlImagen(id, n), prompt: promptVisual });
+        return true;
       } catch (err) {
         ultimoError = err.message;
         const es429 = err.message.includes('429') || err.message.includes('RESOURCE_EXHAUSTED');
-        const pausa = es429 ? 35000 : 4000;
+        const pausa = es429 ? PAUSA_REINTENTO_429_MS : PAUSA_REINTENTO_MS;
         console.warn(`[${ts()}] Imagen ${n}/${cantidad}: intento ${intento} falló — ${err.message}`);
         if (intento < 2) {
           console.log(`[${ts()}] Imagen ${n}/${cantidad}: esperando ${pausa / 1000}s antes de reintentar...`);
-          await new Promise(r => setTimeout(r, pausa));
+          await esperar(pausa);
         }
       }
     }
-
-    if (!guardada) {
-      console.error(`[${ts()}] Imagen ${n}/${cantidad}: usando placeholder negro.`);
-      crearPlaceholder(ruta);
-      galeria.push({ id, numero: n, ruta, urlPublica, prompt: null, fecha: new Date().toISOString() });
-      if (onErrorImagen) onErrorImagen(n, ultimoError);
-    }
-
-    rutas.push(ruta);
+    await usarPlaceholder(n, ultimoError);
+    return false;
   }
+
+  let n = 1;
+  if (api !== 'google' && !refImagePath) {
+    // Serial until one succeeds: that image anchors the rest (edits) for character consistency
+    for (; n <= cantidad && !refAuto; n++) {
+      if (await generarUna(n)) refAuto = rutas[n - 1];
+    }
+  }
+  const restantes = Array.from({ length: cantidad - n + 1 }, (_, i) => n + i);
+  await ejecutarConLimite(restantes.map(k => () => generarUna(k)), CONCURRENCIA_IMAGENES[api] || 2);
 
   console.log(`[${ts()}] Imagenes: todas las imágenes generadas.`);
   return rutas;
@@ -400,54 +414,44 @@ async function generarImagenes(guion, cantidad, id, onPrompt, modelo, api, estil
 
 /**
  * Genera todos los prompts visuales en una sola llamada a GPT.
+ * Template: nichos/<id>/prompt-imagenes-bloque.txt if present, else prompts/shorts/imagenes-bloque.txt.
  * Devuelve un array de N strings, uno por fotograma.
  */
 async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escenario = 'ninguno', nichoConfig) {
   const estiloEN    = ESTILOS_EN[estilo]    || ESTILOS_EN.cinematico;
   const escenarioEN = ESCENARIOS_EN[escenario] || '';
 
-  const content =
-    `Actúa como experto en prompts visuales para videos de ${nichoConfig.nombre}. ` +
-    `Escribe exactamente ${cantidad} prompts en inglés, uno por párrafo separado por línea en blanco. ` +
-    `Cada prompt describe una escena DIFERENTE que juntas narran: ${nichoConfig.imagenes.arcoNarrativo} (adapta según cantidad). ` +
-    `Cada prompt empieza con "Create an image of". ` +
-    `El estilo visual de TODOS los prompts DEBE ser: ${estiloEN}. ` +
-    (escenarioEN ? `El entorno/ambiente de TODOS los prompts DEBE incluir: ${escenarioEN}. ` : '') +
-    `Devuelve SOLO los ${cantidad} prompts, sin numeración ni explicaciones. ` +
-    `Guion: ${guion}`;
+  const plantilla = nichoConfig.prompts?.imagenesBloque || leerPromptArchivo('shorts', 'imagenes-bloque.txt');
+  const content = renderPrompt(plantilla, {
+    guion,
+    cantidad,
+    nombre_nicho:     nichoConfig.nombre,
+    arco_narrativo:   nichoConfig.imagenes?.arcoNarrativo || '',
+    estilo_visual_en: estiloEN,
+    escenario_regla:  escenarioEN ? `El entorno/ambiente de TODOS los prompts DEBE incluir: ${escenarioEN}. ` : '',
+  }).trim();
 
-  const resp = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content }],
-      temperature: 0.9,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
+  const texto = await chat({ model: 'gpt-4o-mini', prompt: content, temperature: 0.9 });
+  const prompts = texto.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 10);
 
-  const texto = resp.data.choices[0].message.content.trim();
-  let prompts = texto.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 10);
-
-  // Garantizar que tengamos suficientes prompts
+  const generico = `Create an image of a scene from a ${nichoConfig.nombre} video, ${estiloEN}.`;
   while (prompts.length < cantidad) {
-    prompts.push(prompts[prompts.length - 1] || 'Create an image of a person achieving their goals in a cinematic motivational scene.');
+    prompts.push(prompts[prompts.length - 1] || generico);
   }
   return prompts.slice(0, cantidad);
 }
 
 /**
- * Genera imágenes una por una (secuencial).
+ * Genera imágenes una por una (secuencial, solo OpenAI).
  * Llama onCadaImagen(n, ruta, urlPublica) después de guardar cada una.
+ *
+ * @param {object} o - { guion, cantidad, id, nichoConfig, modelo?, quality?, estilo?, escenario?,
+ *                       onCadaImagen?, onPrompt?, onStoryboard? }
  */
-async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, nichoConfig, modelo = MODELO_IMAGEN_OPENAI_DEFAULT, quality = 'medium') {
-  const ts = () => new Date().toTimeString().slice(0, 8);
-
+async function generarImagenesSecuencial({
+  guion, cantidad, id, nichoConfig, modelo = MODELO_IMAGEN_OPENAI_DEFAULT, quality = 'medium',
+  estilo = 'cinematico', escenario = 'ninguno', onCadaImagen = null, onPrompt = null, onStoryboard = null,
+}) {
   let prompts;
   if (cantidad > 1) {
     console.log(`[${ts()}] Imagenes: generando storyboard para ${cantidad} escenas (estilo=${estilo} escenario=${escenario} nicho=${nichoConfig.id})...`);
@@ -471,7 +475,7 @@ async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPr
   for (let i = 0; i < cantidad; i++) {
     const n = i + 1;
     const ruta = rutaImagen(id, n);
-    const urlPublica = `/output/imagenes/imagen-${id}-${n}.png`;
+    const urlPublica = urlImagen(id, n);
     const prompt = prompts[i];
 
     if (onPrompt) onPrompt(n, prompt);
@@ -483,7 +487,7 @@ async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPr
       try {
         const buffer = await llamarOpenAIImagen(prompt, modelo, quality);
         fs.writeFileSync(ruta, buffer);
-        galeria.push({ id, numero: n, ruta, urlPublica, prompt, fecha: new Date().toISOString() });
+        agregarAGaleria({ id, numero: n, ruta, urlPublica, prompt });
         console.log(`[${ts()}] Imagen ${n}/${cantidad}: guardada (intento ${intento}).`);
         guardada = true;
         break;
@@ -494,8 +498,8 @@ async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPr
 
     if (!guardada) {
       console.error(`[${ts()}] Imagen ${n}/${cantidad}: usando placeholder negro.`);
-      crearPlaceholder(ruta);
-      galeria.push({ id, numero: n, ruta, urlPublica, prompt: null, fecha: new Date().toISOString() });
+      await crearPlaceholder(ruta);
+      agregarAGaleria({ id, numero: n, ruta, urlPublica, prompt: null });
     }
 
     rutas.push(ruta);

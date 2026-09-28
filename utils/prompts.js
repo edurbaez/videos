@@ -1,3 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+
+const DIR_PROMPTS = path.join(__dirname, '..', 'prompts');
+const RE_NOMBRE = /^[a-z0-9_-]+$/i;
+const RE_ARCHIVO = /^[a-z0-9_-]+\.txt$/i;
+
 /**
  * Reemplaza todos los {{placeholder}} de un template con los valores del objeto vars.
  * Los placeholders sin valor en vars se dejan como cadena vacía.
@@ -25,4 +32,18 @@ function joinHashtags(hashtags = []) {
   return hashtags.join(' ');
 }
 
-module.exports = { renderPrompt, joinHashtags };
+/**
+ * Reads prompts/<carpeta>/<archivo>. Both names are validated (no separators, no "..")
+ * and the resolved path must stay inside prompts/, so a caller can never read arbitrary files.
+ */
+function leerPromptArchivo(carpeta, archivo, base = DIR_PROMPTS) {
+  if (typeof carpeta !== 'string' || !RE_NOMBRE.test(carpeta) || typeof archivo !== 'string' || !RE_ARCHIVO.test(archivo)) {
+    throw new Error(`Prompt inválido: "${carpeta}/${archivo}".`);
+  }
+  const raiz = path.resolve(base);
+  const ruta = path.resolve(raiz, carpeta, archivo);
+  if (!ruta.startsWith(raiz + path.sep)) throw new Error(`Prompt inválido: "${carpeta}/${archivo}".`);
+  return fs.readFileSync(ruta, 'utf-8');
+}
+
+module.exports = { renderPrompt, joinHashtags, leerPromptArchivo };

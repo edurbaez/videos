@@ -20,12 +20,22 @@
   "caption": {
     "estilo": "curioso, compartible, directo",
     "ctaDefault": "Sígueme para más curiosidades increíbles",
-    "hashtagsBase": ["#curiosidades", "#sabiasque", "#datoscuriosos"]
+    "hashtagsBase": [
+      "#curiosidades",
+      "#sabiasque",
+      "#datoscuriosos"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "secuencia explicativa",
     "arcoNarrativo": "objeto o hecho central, contexto histórico, detalle clave, remate visual",
     "tipoEscenas": "presentación, contexto, detalle, conclusión",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": true
+  },
+  "youtube": {
+    "categoria": "27"
   }
 }

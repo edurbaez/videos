@@ -1,0 +1,2 @@
+FORMAT — single narrator:
+- Continuous spoken text by one teacher. Plain paragraphs separated by blank lines.

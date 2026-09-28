@@ -10,20 +10,59 @@
 
 const path = require('path');
 const fs   = require('fs');
+const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. AUTENTICACIÓN POR API KEY
 // ─────────────────────────────────────────────────────────────────────────────
-// Si API_KEY está definida en .env, se exige en todas las peticiones vía
-// header "x-api-key" o query param "apiKey".
+// Si API_KEY está definida en .env, se exige en todas las peticiones (salvo el frontend estático,
+// que se sirve antes de este middleware, y /youtube/callback, protegido por el state OAuth).
+// Dónde se acepta la clave:
+//   - header "x-api-key": en cualquier ruta (fetch del frontend, ver public/js/api.js)
+//   - query "?apiKey=": solo en rutas SSE (EventSource no puede enviar headers)
+//   - cookie "apiKey": solo en GET de /output/* y /youtube/auth (<img>/<video>/<audio> y
+//     navegación no pueden enviar headers). SameSite=Strict la limita a peticiones del propio sitio.
 // Si no está definida, el middleware pasa sin bloquear (retrocompatibilidad).
+const RUTAS_SIN_CLAVE = new Set(['/youtube/callback']);
+const RUTAS_SSE = [
+  /^\/progreso\/[^/]+$/,
+  /^\/util\/(imagenes|audio)-progress\/[^/]+$/,
+  /^\/(curso|largo)\/progreso\/[^/]+$/,
+];
+const esRutaCookie = p => p.startsWith('/output/') || p === '/youtube/auth';
+
+const hashClave = v => crypto.createHash('sha256').update(String(v)).digest();
+
+/** Constant-time comparison (hashing first equalizes lengths). */
+function claveCoincide(recibida, esperada) {
+  if (typeof recibida !== 'string' || !recibida) return false;
+  return crypto.timingSafeEqual(hashClave(recibida), hashClave(esperada));
+}
+
+function leerCookie(req, nombre) {
+  for (const parte of String(req.headers.cookie || '').split(';')) {
+    const i = parte.indexOf('=');
+    if (i > 0 && parte.slice(0, i).trim() === nombre) {
+      try { return decodeURIComponent(parte.slice(i + 1).trim()); } catch { return null; }
+    }
+  }
+  return null;
+}
+
 function validarApiKey(req, res, next) {
   const claveEsperada = process.env.API_KEY;
   if (!claveEsperada) return next();
+  if (RUTAS_SIN_CLAVE.has(req.path)) return next();
 
-  const claveRecibida = req.headers['x-api-key'] || req.query.apiKey;
-  if (!claveRecibida || claveRecibida !== claveEsperada) {
+  const esGet = req.method === 'GET' || req.method === 'HEAD';
+  let claveRecibida = req.headers['x-api-key'];
+  if (!claveRecibida && esGet && RUTAS_SSE.some(re => re.test(req.path))) claveRecibida = req.query.apiKey;
+  if (!claveRecibida && esGet && esRutaCookie(req.path)) claveRecibida = leerCookie(req, 'apiKey');
+  // Never let the key travel further (logs, handlers)
+  if (req.query && 'apiKey' in req.query) delete req.query.apiKey;
+
+  if (!claveCoincide(claveRecibida, claveEsperada)) {
     return res.status(401).json({ error: 'No autorizado.' });
   }
   next();
@@ -92,6 +131,16 @@ function validarCantidad(cantidad, max = MAX_CANTIDAD) {
   const n = parseInt(cantidad);
   if (isNaN(n) || n < 1) return 1;
   return Math.min(n, max);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5a. VALIDACIÓN DE CALIDAD DE IMAGEN (OpenAI)
+// ─────────────────────────────────────────────────────────────────────────────
+const CALIDADES = new Set(['low', 'medium', 'high']);
+function validarQuality(quality, porDefecto = 'medium') {
+  if (quality === undefined || quality === null || quality === '') return porDefecto;
+  if (!CALIDADES.has(quality)) throw new Error(`Calidad "${String(quality).slice(0, 20)}" no válida. Usa: low, medium o high.`);
+  return quality;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,7 +245,9 @@ module.exports = {
   validarRefImagePath,
   sanitizarTema,
   validarCantidad,
+  validarQuality,
   validarFechaProgramada,
+  claveCoincide,
   validarModelo,
   normalizarModeloImagen,
   MODELOS_OPENAI,

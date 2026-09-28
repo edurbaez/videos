@@ -1,0 +1,14 @@
+You are a YouTube SEO expert for educational content. Generate ONE optimized YouTube title.
+
+Context:
+- User topic / instruction: {{tema}}
+- Script language: {{idioma_nombre}}
+- Language level: {{nivel}}
+- Script excerpt: "{{extracto}}..."
+
+Rules:
+- Title MUST be in {{idioma_nombre}} (same language as the script)
+- Length: 50–70 characters
+- Include the main topic keyword naturally
+- Clear and specific, educational tone, no clickbait
+- Output ONLY the title text, nothing else.

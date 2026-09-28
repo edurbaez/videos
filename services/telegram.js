@@ -1,40 +1,37 @@
 const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
-require('dotenv').config();
+const { ts } = require('../utils/log');
 
 const TIMEOUT_SUBIDA_MS = 180_000;
 
+const MAX_CAPTION_VIDEO = 1024;
+
 /**
- * Envía el caption y el video a un canal/chat de Telegram en dos pasos:
- *  1. Mensaje de texto con el caption
- *  2. Video como archivo multimedia (con soporte de streaming)
+ * Envía el video con su caption a Telegram. El caption va una sola vez: como pie del video,
+ * salvo que supere el límite de Telegram (1024), en cuyo caso se envía antes como mensaje
+ * de texto (hasta 4096) y el video va sin pie.
  *
  * @param {string} rutaVideo - Ruta absoluta del archivo MP4
  * @param {string} caption   - Texto del caption del video
- * @returns {boolean} - true si ambos envíos fueron exitosos
+ * @returns {boolean} - true si los envíos fueron exitosos
  */
-async function enviarATelegram(rutaVideo, caption) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
+async function enviarATelegram(rutaVideo, caption = '') {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   const base = `https://api.telegram.org/bot${token}`;
+  const captionLargo = caption.length > MAX_CAPTION_VIDEO;
 
-  // ── PASO 1: Enviar caption como texto ────────────────────────────────────
-  console.log(`[${ts()}] Telegram: enviando caption...`);
-  await axios.post(`${base}/sendMessage`, {
-    chat_id: chatId,
-    text: caption,
-  });
-  console.log(`[${ts()}] Telegram: caption enviado.`);
+  if (captionLargo) {
+    console.log(`[${ts()}] Telegram: caption de ${caption.length} caracteres, se envía como texto...`);
+    await enviarTexto(caption);
+  }
 
-  // ── PASO 2: Enviar video ──────────────────────────────────────────────────
   console.log(`[${ts()}] Telegram: enviando video (${rutaVideo})...`);
   const form = new FormData();
   form.append('chat_id', chatId);
   form.append('video', fs.createReadStream(rutaVideo));
-  // Telegram rechaza el video entero si el caption supera 1024 caracteres; el completo ya se envió como texto
-  form.append('caption', caption.length > 1024 ? caption.slice(0, 1021) + '...' : caption);
+  if (caption && !captionLargo) form.append('caption', caption);
   form.append('supports_streaming', 'true');
 
   await axios.post(`${base}/sendVideo`, form, {
@@ -53,7 +50,6 @@ async function enviarATelegram(rutaVideo, caption) {
  * @param {string} texto
  */
 async function enviarTexto(texto) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   console.log(`[${ts()}] Telegram: enviando texto... (chat_id=${chatId})`);
@@ -75,47 +71,10 @@ async function enviarTexto(texto) {
 }
 
 /**
- * Envía un grupo de fotos a Telegram (máx 10 por grupo).
- * @param {string[]} rutasImagenes - Rutas absolutas de las imágenes
- */
-async function enviarFotos(rutasImagenes) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  const base = `https://api.telegram.org/bot${token}`;
-
-  // Telegram permite máx 10 por grupo; dividir si hay más
-  const grupos = [];
-  for (let i = 0; i < rutasImagenes.length; i += 10) {
-    grupos.push(rutasImagenes.slice(i, i + 10));
-  }
-
-  for (const grupo of grupos) {
-    const form = new FormData();
-    form.append('chat_id', chatId);
-    const media = grupo.map((ruta, i) => {
-      const campo = `foto${i}`;
-      form.append(campo, fs.createReadStream(ruta));
-      return { type: 'photo', media: `attach://${campo}` };
-    });
-    form.append('media', JSON.stringify(media));
-    console.log(`[${ts()}] Telegram: enviando ${grupo.length} foto(s)...`);
-    await axios.post(`${base}/sendMediaGroup`, form, {
-      headers: form.getHeaders(),
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-      timeout: TIMEOUT_SUBIDA_MS,
-    });
-    console.log(`[${ts()}] Telegram: fotos enviadas.`);
-  }
-}
-
-/**
  * Envía una sola foto a Telegram.
  * @param {string} ruta - Ruta absoluta de la imagen
  */
 async function enviarFoto(ruta) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   const form = new FormData();
@@ -143,7 +102,6 @@ async function enviarFoto(ruta) {
  * @param {string} [caption] - Texto opcional al pie del audio
  */
 async function enviarAudio(ruta, caption = '') {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   const form = new FormData();
@@ -166,4 +124,4 @@ async function enviarAudio(ruta, caption = '') {
   }
 }
 
-module.exports = { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio };
+module.exports = { enviarATelegram, enviarTexto, enviarFoto, enviarAudio };

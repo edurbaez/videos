@@ -4,6 +4,7 @@ const path = require('path');
 const { generarAudio } = require('./audio');
 const { obtenerDuracionAudio, ejecutarFFmpeg } = require('./video');
 const { parsearDialogo } = require('./guionLargo');
+const { ejecutarConLimite } = require('../utils/concurrencia');
 
 // Google admite 5000 bytes y OpenAI tts-1 4096 chars; 4000 bytes cumple ambos (bytes >= chars)
 const MAX_BYTES_CHUNK = 4000;
@@ -41,17 +42,6 @@ function trocearTexto(texto) {
   }
   if (actual.trim()) trozos.push(actual.trim());
   return trozos;
-}
-
-async function ejecutarConLimite(tareas, limite) {
-  let siguiente = 0;
-  const trabajadores = Array.from({ length: Math.min(limite, tareas.length) }, async () => {
-    while (siguiente < tareas.length) {
-      const i = siguiente++;
-      await tareas[i]();
-    }
-  });
-  await Promise.all(trabajadores);
 }
 
 /** Une varios MP3 en uno, normalizando a 24 kHz mono y añadiendo una pausa tras cada pieza. */
@@ -174,4 +164,4 @@ function formatearTiempo(seg) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
-module.exports = { generarAudioLargo, formatearTiempo, trocearTexto };
+module.exports = { generarAudioLargo, formatearTiempo, trocearTexto, segmentarSeccion };

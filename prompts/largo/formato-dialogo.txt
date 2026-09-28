@@ -1,0 +1,4 @@
+FORMAT — two-voice dialogue:
+- Two speakers: "F" (female teacher who explains) and "M" (male learner who asks questions, tries examples, makes typical mistakes that F corrects).
+- EVERY line must start with "F:" or "M:" followed by the spoken text. One turn per line. No other lines.
+- Keep turns natural: F explains in depth; M's turns are shorter but meaningful.

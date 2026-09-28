@@ -1,7 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
-require('dotenv').config();
+const { ts } = require('../utils/log');
 
 /**
  * Genera un archivo SRT de subtítulos a partir de un MP3 usando Whisper API.
@@ -12,7 +12,6 @@ require('dotenv').config();
  * @returns {string} - Ruta del archivo SRT guardado
  */
 async function generarSubtitulos(rutaAudio, rutaDestino, idioma = 'es') {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   console.log(`[${ts()}] Subtitulos: enviando audio a Whisper API...`);
 
   const form = new FormData();

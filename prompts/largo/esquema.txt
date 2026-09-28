@@ -1,0 +1,10 @@
+You are an expert language teacher designing a {{minutos}}-minute {{tipo_formato}} video lesson for learners of {{idioma_nombre}}, level {{nivel}}.
+
+Topic: {{tema}}
+{{palabras_linea}}
+Design a coherent lesson plan with EXACTLY {{num_secciones}} sections, each about {{minutos_por_seccion}} minutes of speech.
+- Section 1: introduction (what will be learned and why it matters).
+- Middle sections: progress from simple to complex. Each section covers ONE clear sub-topic with explanation, examples and mini-practice. No repeated content between sections.
+- Last section: recap of key points and a short practice/challenge for the viewer.
+
+Return JSON: {"titulo": "<lesson title in {{idioma_nombre}}>", "secciones": [{"titulo": "<short section title in {{idioma_nombre}}>", "contenido": "<3-5 concrete points to cover, in English>"}]}

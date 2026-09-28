@@ -1,6 +1,4 @@
-const axios = require('axios');
-require('dotenv').config();
-
+const { chat } = require('./openai');
 const { ESTILOS_EN, ESCENARIOS_EN } = require('../utils/estilos');
 const { renderPrompt } = require('../utils/prompts');
 
@@ -29,23 +27,7 @@ async function generarStoryboard(guion, cantidad, estilo = 'cinematico', escenar
     escenario_regla: escenarioEN ? `5. The environment MUST include: ${escenarioEN}` : '',
   });
 
-  const resp = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content }],
-      temperature: 0.8,
-      response_format: { type: 'json_object' },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  const data = JSON.parse(resp.data.choices[0].message.content);
+  const data = JSON.parse(await chat({ model: 'gpt-4o', prompt: content, temperature: 0.8, json: true }));
   let escenas = Array.isArray(data.escenas) ? data.escenas : [];
   const personaje = data.personaje || 'a determined person';
 

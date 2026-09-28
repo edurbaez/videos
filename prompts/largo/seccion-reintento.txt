@@ -1,0 +1,3 @@
+
+
+Your previous attempt had only {{palabras}} words. Rewrite it with about {{palabras_objetivo}} words, expanding explanations and examples.

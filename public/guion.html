@@ -200,6 +200,7 @@
       transition: width 0.4s;
     }
   </style>
+  <script src="/js/api.js"></script>
 </head>
 <body>
 <div class="container">
@@ -219,6 +220,11 @@
   <div class="card">
     <label for="tema">Tema</label>
     <textarea id="tema" rows="3" placeholder="Ej: la disciplina como hábito diario..."></textarea>
+
+    <label for="nicho" style="margin-top:12px">Nicho</label>
+    <select id="nicho" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:0.9rem;outline:none">
+      <option value="motivacion" selected>Motivación</option>
+    </select>
 
     <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:flex-end">
       <button class="btn" id="btnEnviar" style="flex:2;min-width:200px;margin-top:0">
@@ -275,6 +281,21 @@
 </div>
 
 <script>
+(async () => {
+  try {
+    const nichos = await (await fetch('/nichos')).json();
+    const sel = document.getElementById('nicho');
+    if (!Array.isArray(nichos) || !nichos.length) return;
+    sel.innerHTML = '';
+    nichos.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n.id;
+      opt.textContent = n.nombre;
+      if (n.id === 'motivacion') opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch {}
+})();
 function copiar(id, btn) {
   const ta = document.getElementById(id);
   navigator.clipboard.writeText(ta.value).then(() => {
@@ -307,7 +328,7 @@ document.getElementById('btnEnviar').addEventListener('click', async () => {
     const resp = await fetch('/util/guion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema }),
+      body: JSON.stringify({ tema, nicho: document.getElementById('nicho').value }),
     });
 
     const datos = await resp.json();
@@ -356,7 +377,7 @@ document.getElementById('btnImagenes').addEventListener('click', async () => {
     const resp = await fetch('/util/imagenes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tema, cantidad }),
+      body: JSON.stringify({ tema, cantidad, nicho: document.getElementById('nicho').value }),
     });
     const { id, error } = await resp.json();
     if (error) throw new Error(error);

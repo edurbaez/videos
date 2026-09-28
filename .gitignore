@@ -18,6 +18,8 @@ output/curso/*
 
 # Datos de runtime
 historial.json
+# Temp files from atomic writes (may hold OAuth tokens if a write is interrupted)
+*.tmp
 
 # Tokens OAuth de YouTube (contienen refresh_token — nunca commitear)
 youtube-tokens-*.json
@@ -28,3 +30,8 @@ sugerencias.md
 nplan
 iniciar.bat
 output/largo/*
+
+# Automatización diaria (datos personales y estado de runtime)
+ideas.csv
+ideas-estado.json
+scheduler-estado.json

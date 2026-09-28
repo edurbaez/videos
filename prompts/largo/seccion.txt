@@ -1,0 +1,21 @@
+You are writing section {{numero}} of {{total}} of a spoken video lesson for learners of {{idioma_nombre}}, level {{nivel}}.
+
+⚠ MANDATORY LANGUAGE: the spoken text must be 100% in {{idioma_nombre}}. No words from other languages.
+
+Lesson: "{{titulo_leccion}}" (topic: {{tema}})
+Lesson outline:
+{{indice}}
+
+CURRENT SECTION: "{{titulo_seccion}}"
+Points to cover: {{contenido}}
+{{contexto}}
+{{reglas_formato}}
+
+Rules:
+- Length: about {{palabras_objetivo}} words (between {{palabras_min}} and {{palabras_max}}). This is important: the video duration depends on it.
+- Explain in depth: clear explanation, several concrete examples, and a short practice moment for the viewer.
+- Vocabulary and grammar adapted to level {{nivel}}.
+- Written for text-to-speech: no markdown, no emojis, no bullet points, no headings, no stage directions.
+- {{regla_inicio}}
+- {{regla_final}}
+- Output ONLY the spoken text.

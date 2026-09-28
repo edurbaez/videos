@@ -1,9 +1,22 @@
-const axios = require('axios');
 const fs = require('fs');
-require('dotenv').config();
+
+const { chat } = require('./openai');
+const { ts } = require('../utils/log');
 
 const { rutaGuion } = require('../utils/archivos');
 const { renderPrompt } = require('../utils/prompts');
+
+const MODELO_GUION_DEFAULT = 'gpt-4o';
+const MODELOS_GUION = new Set(['gpt-4o', 'gpt-4o-mini']);
+
+/** Draft model from the niche's guion.modelo (whitelisted); the improvement step always uses gpt-4o. */
+function modeloBorrador(nichoConfig) {
+  const modelo = nichoConfig.guion?.modelo;
+  if (!modelo) return MODELO_GUION_DEFAULT;
+  if (MODELOS_GUION.has(modelo)) return modelo;
+  console.warn(`[${ts()}] Guion: modelo "${String(modelo).slice(0, 40)}" del nicho ${nichoConfig.id} no permitido, se usa ${MODELO_GUION_DEFAULT}.`);
+  return MODELO_GUION_DEFAULT;
+}
 
 /**
  * Genera el guion del video en dos pasos:
@@ -17,13 +30,6 @@ const { renderPrompt } = require('../utils/prompts');
  * @returns {{ guion_final: string, guion_audio: string }}
  */
 async function generarGuion(tema, id, nichoConfig) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
-  const headers = {
-    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-  const endpoint = 'https://api.openai.com/v1/chat/completions';
-
   const vars = {
     tema,
     nombre_nicho:     nichoConfig.nombre,
@@ -36,27 +42,13 @@ async function generarGuion(tema, id, nichoConfig) {
   // ── PASO 1: Borrador ──────────────────────────────────────────────────────
   console.log(`[${ts()}] Guion paso 1: generando borrador para tema "${tema}" (nicho: ${nichoConfig.id})...`);
   const promptBorrador = renderPrompt(nichoConfig.prompts.guionBorrador, vars);
-  const respBorrador = await axios.post(endpoint, {
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: promptBorrador }],
-    temperature: 0.8,
-    max_tokens: 1000,
-  }, { headers });
-
-  const borrador = respBorrador.data.choices[0].message.content.trim();
+  const borrador = await chat({ model: modeloBorrador(nichoConfig), prompt: promptBorrador, temperature: 0.8, maxTokens: 1000 });
   console.log(`[${ts()}] Guion paso 1: borrador generado (${borrador.split('\n').length} líneas).`);
 
   // ── PASO 2: Mejora ────────────────────────────────────────────────────────
   console.log(`[${ts()}] Guion paso 2: mejorando con copywriter viral...`);
   const promptMejora = renderPrompt(nichoConfig.prompts.guionMejora, { ...vars, borrador });
-  const respMejora = await axios.post(endpoint, {
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: promptMejora }],
-    temperature: 0.9,
-    max_tokens: 1000,
-  }, { headers });
-
-  const guion_final = respMejora.data.choices[0].message.content.trim();
+  const guion_final = await chat({ model: 'gpt-4o', prompt: promptMejora, temperature: 0.9, maxTokens: 1000 });
   // Versión audio: todo en una línea para pasarle a TTS
   const guion_audio = guion_final.replace(/\n+/g, ' ').trim();
 
@@ -67,4 +59,4 @@ async function generarGuion(tema, id, nichoConfig) {
   return { guion_final, guion_audio };
 }
 
-module.exports = { generarGuion };
+module.exports = { generarGuion, modeloBorrador };

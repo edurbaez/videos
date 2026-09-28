@@ -20,12 +20,22 @@
   "caption": {
     "estilo": "breve, impactante, viral",
     "ctaDefault": "Sígueme para más motivación diaria",
-    "hashtagsBase": ["#motivacion", "#disciplina", "#exito"]
+    "hashtagsBase": [
+      "#motivacion",
+      "#disciplina",
+      "#exito"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "viaje emocional",
     "arcoNarrativo": "dolor inicial, punto de quiebre, esfuerzo, triunfo",
     "tipoEscenas": "dolor, quiebre, esfuerzo, victoria",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": true
+  },
+  "youtube": {
+    "categoria": "22"
   }
 }

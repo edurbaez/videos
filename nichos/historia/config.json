@@ -20,12 +20,23 @@
   "caption": {
     "estilo": "narrativo, que genere orgullo o asombro por la historia, con gancho educativo",
     "ctaDefault": "Sígueme para aprender historia de una forma que nunca olvidarás",
-    "hashtagsBase": ["#historia", "#historiamundial", "#datoshistoricos", "#curiosidadeshistoricas"]
+    "hashtagsBase": [
+      "#historia",
+      "#historiamundial",
+      "#datoshistoricos",
+      "#curiosidadeshistoricas"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "épica histórica cinematográfica",
     "arcoNarrativo": "época y contexto → protagonista o evento clave → momento de máxima tensión o decisión → consecuencia o legado",
     "tipoEscenas": "contexto, protagonista, climax, legado",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": true
+  },
+  "youtube": {
+    "categoria": "27"
   }
 }

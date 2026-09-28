@@ -1,0 +1,15 @@
+You are a YouTube content creator. Write a description for a YouTube Short.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
+Script excerpt: "{{extracto}}..."
+Format:
+[2–3 sentences in {{idioma_nombre}} about the conflict or battle and its historical consequences]
+
+#hashtag1 #hashtag2 #hashtag3 #hashtag4 #hashtag5 #hashtag6 #hashtag7
+Rules:
+- All in {{idioma_nombre}}
+- Tense, narrative and respectful toward the victims tone
+- Hashtags: topic keywords + #Shorts + niche terms (you may reuse: {{hashtags_base}})
+- Respectful tone: never glorify violence or mock victims.
+- Keep dates, names and facts historically accurate.
+- Output ONLY the formatted text, nothing else.

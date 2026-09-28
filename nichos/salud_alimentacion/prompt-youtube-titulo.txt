@@ -1,0 +1,11 @@
+You are a YouTube SEO expert. Generate ONE optimized YouTube Shorts title.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
+Script excerpt: "{{extracto}}..."
+Rules:
+- Language: {{idioma_nombre}}
+- Length: 50–70 characters
+- Include main keyword naturally
+- Practical, friendly and appetizing tone, no clickbait
+- No medical promises or cure claims; general nutrition information only.
+- Output ONLY the title text, nothing else.

@@ -20,12 +20,23 @@
   "caption": {
     "estilo": "intrigante, que genere curiosidad y miedo sano, con tono conspirativo",
     "ctaDefault": "Sígueme para más misterios que no tienen explicación",
-    "hashtagsBase": ["#misterio", "#inexplicable", "#conspiracion", "#paranormal"]
+    "hashtagsBase": [
+      "#misterio",
+      "#inexplicable",
+      "#conspiracion",
+      "#paranormal"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "tensión y misterio creciente",
     "arcoNarrativo": "ambiente inquietante → revelación del misterio → momento de mayor tensión → cierre ambiguo sin resolver",
     "tipoEscenas": "ambiente, revelacion, tension, cierre",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": true
+  },
+  "youtube": {
+    "categoria": "24"
   }
 }

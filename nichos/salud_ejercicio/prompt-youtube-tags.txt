@@ -1,0 +1,8 @@
+Generate 12 YouTube tags for a {{nombre_nicho}} Short video.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
+Rules:
+- Tags in {{idioma_nombre}}
+- Mix: topic keywords, niche terms (fitness, workout, exercise, healthy habits)
+- Each tag max 30 characters, no # symbol
+- Output comma-separated values only.

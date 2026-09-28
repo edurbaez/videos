@@ -1,32 +1,14 @@
-const axios = require('axios');
-require('dotenv').config();
+const { chat: chatOpenAI } = require('./openai');
+const { LANG_NAMES } = require('../utils/constantes');
+const { renderPrompt, leerPromptArchivo } = require('../utils/prompts');
 
-const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 // Neural2 / tts-1 hablan ~140 palabras por minuto en ritmo explicativo
 const PALABRAS_POR_MINUTO = 140;
 const MINUTOS_POR_SECCION = 2;
 
-const LANG_NAMES = {
-  de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
-  fr: 'French (Français)', pt: 'Portuguese (Português)',
-};
-
-function headers() {
-  return {
-    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-async function chat(prompt, { maxTokens, temperature = 0.7, json = false }) {
-  const resp = await axios.post(ENDPOINT, {
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: prompt }],
-    temperature,
-    max_tokens: maxTokens,
-    ...(json ? { response_format: { type: 'json_object' } } : {}),
-  }, { headers: headers() });
-  return resp.data.choices[0].message.content.trim();
+/** gpt-4o shorthand shared by the long-video and course pipelines. */
+function chat(prompt, { maxTokens, temperature = 0.7, json = false }) {
+  return chatOpenAI({ model: 'gpt-4o', prompt, maxTokens, temperature, json });
 }
 
 function contarPalabras(texto) {
@@ -44,32 +26,22 @@ function planificar(minutos) {
   return { numSecciones, palabrasPorSeccion: Math.round(palabrasTotales / numSecciones), palabrasTotales };
 }
 
+const promptLargo = (archivo, vars) => renderPrompt(leerPromptArchivo('largo', archivo), vars).replace(/\s+$/, '');
+
 function reglasFormato(formato) {
-  if (formato === 'dialogo') {
-    return `FORMAT — two-voice dialogue:
-- Two speakers: "F" (female teacher who explains) and "M" (male learner who asks questions, tries examples, makes typical mistakes that F corrects).
-- EVERY line must start with "F:" or "M:" followed by the spoken text. One turn per line. No other lines.
-- Keep turns natural: F explains in depth; M's turns are shorter but meaningful.`;
-  }
-  return `FORMAT — single narrator:
-- Continuous spoken text by one teacher. Plain paragraphs separated by blank lines.`;
+  return promptLargo(formato === 'dialogo' ? 'formato-dialogo.txt' : 'formato-monologo.txt', {});
 }
 
 async function generarEsquema({ tema, idioma, nivel, minutos, formato, palabras }) {
-  const langName = LANG_NAMES[idioma];
   const { numSecciones } = planificar(minutos);
-  const palabrasLine = palabras ? `\nThese words/phrases must be taught across the lesson (distribute them among sections): ${palabras}\n` : '';
-
-  const prompt = `You are an expert language teacher designing a ${minutos}-minute ${formato === 'dialogo' ? 'two-voice dialogue' : 'single-narrator'} video lesson for learners of ${langName}, level ${nivel}.
-
-Topic: ${tema}
-${palabrasLine}
-Design a coherent lesson plan with EXACTLY ${numSecciones} sections, each about ${MINUTOS_POR_SECCION} minutes of speech.
-- Section 1: introduction (what will be learned and why it matters).
-- Middle sections: progress from simple to complex. Each section covers ONE clear sub-topic with explanation, examples and mini-practice. No repeated content between sections.
-- Last section: recap of key points and a short practice/challenge for the viewer.
-
-Return JSON: {"titulo": "<lesson title in ${langName}>", "secciones": [{"titulo": "<short section title in ${langName}>", "contenido": "<3-5 concrete points to cover, in English>"}]}`;
+  const prompt = promptLargo('esquema.txt', {
+    tema, nivel, minutos,
+    idioma_nombre: LANG_NAMES[idioma],
+    tipo_formato: formato === 'dialogo' ? 'two-voice dialogue' : 'single-narrator',
+    palabras_linea: palabras ? `\nThese words/phrases must be taught across the lesson (distribute them among sections): ${palabras}\n` : '',
+    num_secciones: numSecciones,
+    minutos_por_seccion: MINUTOS_POR_SECCION,
+  });
 
   const raw = await chat(prompt, { maxTokens: 3000, temperature: 0.6, json: true });
   const esquema = JSON.parse(raw);
@@ -80,45 +52,36 @@ Return JSON: {"titulo": "<lesson title in ${langName}>", "secciones": [{"titulo"
 }
 
 async function generarSeccion({ tema, idioma, nivel, formato, esquema, indice, palabrasObjetivo, textoAnterior }) {
-  const langName = LANG_NAMES[idioma];
   const total = esquema.secciones.length;
   const seccion = esquema.secciones[indice];
-  const indiceTexto = esquema.secciones.map((s, i) => `${i + 1}. ${s.titulo}${i === indice ? '  ← CURRENT' : ''}`).join('\n');
   const esPrimera = indice === 0;
   const esUltima = indice === total - 1;
 
-  // Solo el final de la sección anterior: suficiente para enlazar sin inflar el prompt
-  const contexto = textoAnterior
-    ? `\nThe previous section ended like this (continue naturally from here, do NOT repeat it):\n"""${textoAnterior.slice(-900)}"""\n`
-    : '';
-
-  const prompt = `You are writing section ${indice + 1} of ${total} of a spoken video lesson for learners of ${langName}, level ${nivel}.
-
-⚠ MANDATORY LANGUAGE: the spoken text must be 100% in ${langName}. No words from other languages.
-
-Lesson: "${esquema.titulo}" (topic: ${tema})
-Lesson outline:
-${indiceTexto}
-
-CURRENT SECTION: "${seccion.titulo}"
-Points to cover: ${seccion.contenido}
-${contexto}
-${reglasFormato(formato)}
-
-Rules:
-- Length: about ${palabrasObjetivo} words (between ${Math.round(palabrasObjetivo * 0.9)} and ${Math.round(palabrasObjetivo * 1.1)}). This is important: the video duration depends on it.
-- Explain in depth: clear explanation, several concrete examples, and a short practice moment for the viewer.
-- Vocabulary and grammar adapted to level ${nivel}.
-- Written for text-to-speech: no markdown, no emojis, no bullet points, no headings, no stage directions.
-- ${esPrimera ? 'Open with a short welcome and present what the lesson covers.' : 'Do NOT greet or welcome again; continue the lesson seamlessly.'}
-- ${esUltima ? 'Close the lesson with a recap and a friendly goodbye.' : 'Do NOT say goodbye or conclude the lesson; end with a natural transition to the next section.'}
-- Output ONLY the spoken text.`;
+  const prompt = promptLargo('seccion.txt', {
+    tema, nivel, total,
+    numero: indice + 1,
+    idioma_nombre: LANG_NAMES[idioma],
+    titulo_leccion: esquema.titulo,
+    indice: esquema.secciones.map((s, i) => `${i + 1}. ${s.titulo}${i === indice ? '  ← CURRENT' : ''}`).join('\n'),
+    titulo_seccion: seccion.titulo,
+    contenido: seccion.contenido,
+    // Only the tail of the previous section: enough to link without bloating the prompt
+    contexto: textoAnterior
+      ? `\nThe previous section ended like this (continue naturally from here, do NOT repeat it):\n"""${textoAnterior.slice(-900)}"""\n`
+      : '',
+    reglas_formato: reglasFormato(formato),
+    palabras_objetivo: palabrasObjetivo,
+    palabras_min: Math.round(palabrasObjetivo * 0.9),
+    palabras_max: Math.round(palabrasObjetivo * 1.1),
+    regla_inicio: esPrimera ? 'Open with a short welcome and present what the lesson covers.' : 'Do NOT greet or welcome again; continue the lesson seamlessly.',
+    regla_final: esUltima ? 'Close the lesson with a recap and a friendly goodbye.' : 'Do NOT say goodbye or conclude the lesson; end with a natural transition to the next section.',
+  });
 
   let texto = await chat(prompt, { maxTokens: 2500 });
   let palabras = contarPalabras(texto);
 
   if (palabras < palabrasObjetivo * 0.75) {
-    const reintento = `${prompt}\n\nYour previous attempt had only ${palabras} words. Rewrite it with about ${palabrasObjetivo} words, expanding explanations and examples.`;
+    const reintento = prompt + promptLargo('seccion-reintento.txt', { palabras, palabras_objetivo: palabrasObjetivo });
     texto = await chat(reintento, { maxTokens: 2500 });
     palabras = contarPalabras(texto);
   }
@@ -181,4 +144,4 @@ async function generarGuionLargo(opciones, onSeccion) {
   };
 }
 
-module.exports = { generarGuionLargo, parsearDialogo, limpiarEtiquetas, planificar, chat, LANG_NAMES, PALABRAS_POR_MINUTO };
+module.exports = { generarGuionLargo, parsearDialogo, limpiarEtiquetas, planificar, chat, PALABRAS_POR_MINUTO };

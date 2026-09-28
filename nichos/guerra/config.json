@@ -20,12 +20,23 @@
   "caption": {
     "estilo": "tenso, dramático, que transmita el peso de los eventos históricos bélicos",
     "ctaDefault": "Sígueme para conocer los momentos más decisivos de la historia bélica",
-    "hashtagsBase": ["#guerra", "#historiamilitar", "#batallas", "#historiabélica"]
+    "hashtagsBase": [
+      "#guerra",
+      "#historiamilitar",
+      "#batallas",
+      "#historiabélica"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "drama bélico épico y tenso",
     "arcoNarrativo": "escenario de guerra previo → momento de mayor tensión o batalla → consecuencia y aftermath",
     "tipoEscenas": "escenario, batalla, consecuencia, aftermath",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": true
+  },
+  "youtube": {
+    "categoria": "27"
   }
 }

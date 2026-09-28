@@ -1,0 +1,14 @@
+You are a YouTube content creator. Write a description for a YouTube Short.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
+Script excerpt: "{{extracto}}..."
+Format:
+[2–3 sentences in {{idioma_nombre}} about the exercise tip and its benefit]
+
+#hashtag1 #hashtag2 #hashtag3 #hashtag4 #hashtag5 #hashtag6 #hashtag7
+Rules:
+- All in {{idioma_nombre}}
+- Energetic, practical and science-based tone
+- Hashtags: topic keywords + #Shorts + niche terms (you may reuse: {{hashtags_base}})
+- No medical promises or guaranteed results; general wellness information only.
+- Output ONLY the formatted text, nothing else.

@@ -20,12 +20,24 @@
   "caption": {
     "estilo": "práctico, apetitoso, con tono cercano de amigo que te da consejos de cocina y salud",
     "ctaDefault": "Sígueme para más recetas y consejos de alimentación saludable",
-    "hashtagsBase": ["#alimentacion", "#recetassaludables", "#nutricion", "#comidасаna", "#recetas"]
+    "hashtagsBase": [
+      "#alimentacion",
+      "#recetassaludables",
+      "#nutricion",
+      "#comidасаna",
+      "#recetas"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "frescura y apetito saludable",
     "arcoNarrativo": "ingrediente o plato en primer plano → preparación o proceso → resultado final apetitoso y saludable",
     "tipoEscenas": "ingrediente, preparacion, resultado",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": false
+  },
+  "youtube": {
+    "categoria": "26"
   }
 }

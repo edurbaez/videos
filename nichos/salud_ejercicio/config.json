@@ -20,12 +20,24 @@
   "caption": {
     "estilo": "motivador, práctico, con tono de coach cercano y accesible",
     "ctaDefault": "Sígueme para más consejos de ejercicio que realmente funcionan",
-    "hashtagsBase": ["#ejercicio", "#fitness", "#saludable", "#entrenamiento", "#bienestar"]
+    "hashtagsBase": [
+      "#ejercicio",
+      "#fitness",
+      "#saludable",
+      "#entrenamiento",
+      "#bienestar"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "energía y transformación física",
     "arcoNarrativo": "estado inicial o problema → esfuerzo y acción → resultado y beneficio",
     "tipoEscenas": "problema, accion, resultado",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": false
+  },
+  "youtube": {
+    "categoria": "26"
   }
 }

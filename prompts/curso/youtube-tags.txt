@@ -1,0 +1,9 @@
+Generate 12 YouTube tags for an educational video.
+Topic: {{tema}}
+Script language: {{idioma_nombre}}
+Level: {{nivel}}
+
+Rules:
+- Mix: topic keywords, level terms (e.g. "{{nivel}}", "intermediate"), educational terms, language name
+- Each tag max 30 characters, no # symbol
+- Output comma-separated values only, no numbering, no extra text.

@@ -20,12 +20,23 @@
   "caption": {
     "estilo": "directo, informativo, que genere asombro y reflexión sobre el futuro",
     "ctaDefault": "Sígueme para estar al día con la IA y la tecnología",
-    "hashtagsBase": ["#inteligenciaartificial", "#tecnologia", "#futuro", "#ia"]
+    "hashtagsBase": [
+      "#inteligenciaartificial",
+      "#tecnologia",
+      "#futuro",
+      "#ia"
+    ]
   },
   "imagenes": {
     "estiloNarrativo": "innovación y asombro tecnológico",
     "arcoNarrativo": "concepto o máquina tecnológica → proceso o funcionamiento → impacto en la vida humana",
     "tipoEscenas": "concepto, proceso, impacto",
     "requiereStoryboard": true
+  },
+  "automatizacion": {
+    "tendencias": true
+  },
+  "youtube": {
+    "categoria": "28"
   }
 }

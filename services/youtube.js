@@ -1,7 +1,6 @@
 const { google } = require('googleapis');
 const fs          = require('fs');
 const path        = require('path');
-const axios       = require('axios');
 const crypto      = require('crypto');
 
 const CHANNELS_CONFIG = path.join(__dirname, '..', 'youtube-channels.json');
@@ -10,10 +9,10 @@ const SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
 ];
 
-const LANG_NAMES = {
-  de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
-  fr: 'French (Français)', pt: 'Portuguese (Português)',
-};
+const { chat } = require('./openai');
+const { LANG_NAMES } = require('../utils/constantes');
+const { escribirJsonAtomico } = require('../utils/archivos');
+const { renderPrompt, joinHashtags, leerPromptArchivo } = require('../utils/prompts');
 
 // ── OAuth helpers ─────────────────────────────────────────────────────────────
 
@@ -65,7 +64,7 @@ async function manejarCallback(code, state) {
   const canal = consumirEstadoOAuth(state);
   const client = crearCliente();
   const { tokens } = await client.getToken(code);
-  fs.writeFileSync(tokenPath(canal), JSON.stringify(tokens, null, 2));
+  escribirJsonAtomico(tokenPath(canal), tokens);
   return canal;
 }
 
@@ -85,7 +84,11 @@ async function obtenerClienteAutenticado(canal) {
   // Persiste el refresh automático si googleapis renueva el token
   client.on('tokens', (newTokens) => {
     const current = cargarTokens(canal) || {};
-    fs.writeFileSync(tokenPath(canal), JSON.stringify({ ...current, ...newTokens }, null, 2));
+    try {
+      escribirJsonAtomico(tokenPath(canal), { ...current, ...newTokens });
+    } catch (err) {
+      console.error(`[YouTube] No se pudieron guardar los tokens renovados de "${canal}": ${err.message}`);
+    }
   });
   return client;
 }
@@ -115,77 +118,26 @@ function listarCanalesConfig() {
 
 // ── Generación de metadatos con GPT-4o-mini ───────────────────────────────────
 
-function authHeader() {
-  return {
-    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-async function gptMini(prompt, maxTokens = 200) {
-  const resp = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    { model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: maxTokens },
-    { headers: authHeader() },
-  );
-  return resp.data.choices[0].message.content.trim();
+function gptMini(prompt, maxTokens = 200) {
+  return chat({ model: 'gpt-4o-mini', prompt, temperature: 0.7, maxTokens });
 }
 
 async function generarMetadatosYoutube(tema, guion, idioma, nivel, { esShort = true } = {}) {
-  const langName  = LANG_NAMES[idioma] || idioma;
-  const tipoVideo = esShort ? 'short educational video' : 'long-form educational video';
-  const extracto  = guion.slice(0, 300);
-
-  const PROMPT_TITULO = `You are a YouTube SEO expert for educational content. Generate ONE optimized YouTube title.
-
-Context:
-- User topic / instruction: ${tema}
-- Script language: ${langName}
-- Language level: ${nivel}
-- Script excerpt: "${extracto}..."
-
-Rules:
-- Title MUST be in ${langName} (same language as the script)
-- Length: 50–70 characters
-- Include the main topic keyword naturally
-- Clear and specific, educational tone, no clickbait
-- Output ONLY the title text, nothing else.`;
-
-  const PROMPT_DESCRIPCION = `You are a YouTube content creator for an educational channel. Write a bilingual YouTube description for a ${tipoVideo}.
-
-Context:
-- User topic / instruction: ${tema}
-- Script language: ${langName}
-- Language level: ${nivel}
-
-Output EXACTLY in this format (no extra lines before or after):
-🇩🇪 [2–3 sentences in German about what viewers will learn]
-
-🇪🇸 [2–3 sentences in Spanish about what viewers will learn]
-
-#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8
-
-Rules:
-- German section: ALWAYS in German regardless of script language
-- Spanish section: ALWAYS in Spanish regardless of script language
-- Hashtags: topic keywords + level tag (e.g. #${nivel} #${langName.split(' ')[0]}) + educational terms
-- Concise and informative
-- Output ONLY the formatted text above, nothing else.`;
-
-  const PROMPT_TAGS = `Generate 12 YouTube tags for an educational video.
-Topic: ${tema}
-Script language: ${langName}
-Level: ${nivel}
-
-Rules:
-- Mix: topic keywords, level terms (e.g. "${nivel}", "intermediate"), educational terms, language name
-- Each tag max 30 characters, no # symbol
-- Output comma-separated values only, no numbering, no extra text.`;
+  const langName = LANG_NAMES[idioma] || idioma;
+  const vars = {
+    tema,
+    nivel,
+    idioma_nombre: langName,
+    idioma_corto:  langName.split(' ')[0],
+    extracto:      guion.slice(0, 300),
+    tipo_video:    esShort ? 'short educational video' : 'long-form educational video',
+  };
+  const prompt = archivo => renderPrompt(leerPromptArchivo('curso', archivo), vars).trim();
 
   const [titulo, descripcion, tagsRaw] = await Promise.all([
-    gptMini(PROMPT_TITULO, 100),
-    gptMini(PROMPT_DESCRIPCION, 500),
-    gptMini(PROMPT_TAGS, 200),
+    gptMini(prompt('youtube-titulo.txt'), 100),
+    gptMini(prompt('youtube-descripcion.txt'), 500),
+    gptMini(prompt('youtube-tags.txt'), 200),
   ]);
 
   const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean).slice(0, 14);
@@ -200,7 +152,12 @@ Rules:
 
 // ── Subida a YouTube ──────────────────────────────────────────────────────────
 
-async function subirVideo({ rutaVideo, titulo, descripcion, tags, canal, privacidad = 'private', publicarEn = null }) {
+const CATEGORIA_DEFAULT = '27'; // Education
+
+/** YouTube category id: digits only, else the Education default. */
+const categoriaValida = c => (/^\d{1,3}$/.test(String(c ?? '')) ? String(c) : CATEGORIA_DEFAULT);
+
+async function subirVideo({ rutaVideo, titulo, descripcion, tags, canal, privacidad = 'private', publicarEn = null, categoria = CATEGORIA_DEFAULT }) {
   const auth    = await obtenerClienteAutenticado(canal);
   const youtube = google.youtube({ version: 'v3', auth });
 
@@ -219,7 +176,7 @@ async function subirVideo({ rutaVideo, titulo, descripcion, tags, canal, privaci
         title:       titulo,
         description: descripcion,
         tags,
-        categoryId:  '27', // Education
+        categoryId:  categoriaValida(categoria),
       },
       status,
     },
@@ -234,23 +191,21 @@ async function subirVideo({ rutaVideo, titulo, descripcion, tags, canal, privaci
   };
 }
 
-async function generarMetadatosShorts(tema, guion, nichoNombre) {
-  const extracto = guion.slice(0, 300);
-
-  const PROMPT_TITULO = `You are a YouTube SEO expert. Generate ONE optimized YouTube Shorts title.
-Topic: ${tema}
-Niche: ${nichoNombre}
-Script excerpt: "${extracto}..."
+// Built-in prompts, used when the niche has no prompt-youtube-*.txt (original behavior)
+const PROMPTS_SHORTS_FALLBACK = {
+  youtubeTitulo: `You are a YouTube SEO expert. Generate ONE optimized YouTube Shorts title.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
+Script excerpt: "{{extracto}}..."
 Rules:
 - Language: Spanish
 - Length: 50–70 characters
 - Include main keyword naturally
 - Engaging, motivational tone, no clickbait
-- Output ONLY the title text, nothing else.`;
-
-  const PROMPT_DESCRIPCION = `You are a YouTube content creator. Write a description for a YouTube Short.
-Topic: ${tema}
-Niche: ${nichoNombre}
+- Output ONLY the title text, nothing else.`,
+  youtubeDescripcion: `You are a YouTube content creator. Write a description for a YouTube Short.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
 Format:
 [2–3 sentences in Spanish describing the video content]
 
@@ -259,20 +214,38 @@ Rules:
 - All in Spanish
 - Motivational tone
 - Hashtags: topic keywords + #Shorts + niche terms
-- Output ONLY the formatted text, nothing else.`;
-
-  const PROMPT_TAGS = `Generate 12 YouTube tags for a motivational Short video.
-Topic: ${tema}
-Niche: ${nichoNombre}
+- Output ONLY the formatted text, nothing else.`,
+  youtubeTags: `Generate 12 YouTube tags for a motivational Short video.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
 Rules:
 - Mix: topic keywords, niche terms, motivational terms
 - Each tag max 30 characters, no # symbol
-- Output comma-separated values only.`;
+- Output comma-separated values only.`,
+};
+
+/**
+ * Title, description and tags for a Short, from the niche's prompt-youtube-*.txt files
+ * (placeholders: tema, extracto, nombre_nicho, idioma, idioma_nombre, tono, hashtags_base).
+ * @param {object} nichoConfig - cargarNicho() result
+ */
+async function generarMetadatosShorts(tema, guion, nichoConfig) {
+  const idioma = nichoConfig.idioma || 'es';
+  const vars = {
+    tema,
+    extracto:      guion.slice(0, 300),
+    nombre_nicho:  nichoConfig.nombre,
+    idioma,
+    idioma_nombre: LANG_NAMES[idioma] || idioma,
+    tono:          nichoConfig.guion?.tono || '',
+    hashtags_base: joinHashtags(nichoConfig.caption?.hashtagsBase || []),
+  };
+  const prompt = clave => renderPrompt(nichoConfig.prompts?.[clave] || PROMPTS_SHORTS_FALLBACK[clave], vars).trim();
 
   const [titulo, descripcion, tagsRaw] = await Promise.all([
-    gptMini(PROMPT_TITULO, 100),
-    gptMini(PROMPT_DESCRIPCION, 400),
-    gptMini(PROMPT_TAGS, 200),
+    gptMini(prompt('youtubeTitulo'), 100),
+    gptMini(prompt('youtubeDescripcion'), 400),
+    gptMini(prompt('youtubeTags'), 200),
   ]);
 
   const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean).slice(0, 14);
@@ -406,5 +379,6 @@ module.exports = {
   generarMetadatosYoutube,
   generarMetadatosShorts,
   subirVideo,
+  categoriaValida,
   obtenerEstadisticasCanal,
 };

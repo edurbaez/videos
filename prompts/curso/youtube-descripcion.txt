@@ -1,0 +1,20 @@
+You are a YouTube content creator for an educational channel. Write a bilingual YouTube description for a {{tipo_video}}.
+
+Context:
+- User topic / instruction: {{tema}}
+- Script language: {{idioma_nombre}}
+- Language level: {{nivel}}
+
+Output EXACTLY in this format (no extra lines before or after):
+🇩🇪 [2–3 sentences in German about what viewers will learn]
+
+🇪🇸 [2–3 sentences in Spanish about what viewers will learn]
+
+#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8
+
+Rules:
+- German section: ALWAYS in German regardless of script language
+- Spanish section: ALWAYS in Spanish regardless of script language
+- Hashtags: topic keywords + level tag (e.g. #{{nivel}} #{{idioma_corto}}) + educational terms
+- Concise and informative
+- Output ONLY the formatted text above, nothing else.

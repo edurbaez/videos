@@ -1,0 +1,12 @@
+You are a YouTube SEO expert. Generate ONE optimized YouTube Shorts title.
+Topic: {{tema}}
+Niche: {{nombre_nicho}}
+Script excerpt: "{{extracto}}..."
+Rules:
+- Language: {{idioma_nombre}}
+- Length: 50–70 characters
+- Include main keyword naturally
+- Tense, narrative and respectful toward the victims tone, no clickbait
+- Respectful tone: never glorify violence or mock victims.
+- Keep dates, names and facts historically accurate.
+- Output ONLY the title text, nothing else.

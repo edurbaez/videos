@@ -1,17 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
-const { GoogleAuth } = require('google-auth-library');
-require('dotenv').config();
-
-async function obtenerTokenTTS() {
-  const auth = new GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-  });
-  const client = await auth.getClient();
-  const { token } = await client.getAccessToken();
-  return token;
-}
+const { obtenerAccessToken } = require('./googleAuth');
+const { ts } = require('../utils/log');
 
 // Voces Google TTS disponibles por idioma y genero
 const VOCES_GOOGLE = {
@@ -57,7 +47,6 @@ function recortarPorBytes(texto, maxBytes) {
 }
 
 async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es', vozEspecifica) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const { nombreVoz, langCode } = resolverVozGoogle(idioma, genero, vozEspecifica);
   console.log(`[${ts()}] Audio: sintetizando con Google TTS — voz: ${nombreVoz} lang: ${langCode} (${texto.length} chars)...`);
 
@@ -67,7 +56,7 @@ async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es', voz
     console.warn(`[${ts()}] Audio: texto recortado de ${Buffer.byteLength(texto, 'utf8')} a ${Buffer.byteLength(textoTruncado, 'utf8')} bytes (límite Google TTS).`);
   }
 
-  const token = await obtenerTokenTTS();
+  const token = await obtenerAccessToken();
 
   let resp;
   try {
@@ -99,7 +88,6 @@ async function generarAudioGoogle(texto, rutaDestino, genero, idioma = 'es', voz
 }
 
 async function generarAudioOpenAI(texto, rutaDestino, genero, vozEspecifica) {
-  const ts = () => new Date().toTimeString().slice(0, 8);
   const voz = vozEspecifica || VOCES_OPENAI[genero] || VOCES_OPENAI.masculino;
   console.log(`[${ts()}] Audio: sintetizando con OpenAI TTS — voz: ${voz} (${texto.length} chars)...`);
 
