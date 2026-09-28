@@ -582,7 +582,7 @@
           <div id="modelo-imagen-wrap">
             <label for="modelo-imagen" style="margin-bottom:6px;">Modelo de imagen</label>
             <select id="modelo-imagen">
-              <option value="gpt-image-1" >gpt-image-1 — Potente</option>
+              <option value="gpt-image-2" >gpt-image-2 — Potente</option>
               <option value="gpt-image-1-mini" selected>gpt-image-1-mini — Económico</option>
             </select>
           </div>
@@ -967,8 +967,8 @@ Script to revise:
     } else {
       wrap.style.display = '';
       // Restaurar opciones OpenAI si se cambió
-      if (!sel.querySelector('option[value="gpt-image-1"]')) {
-        sel.innerHTML = '<option value="gpt-image-1">gpt-image-1 — Potente</option>'
+      if (!sel.querySelector('option[value="gpt-image-2"]')) {
+        sel.innerHTML = '<option value="gpt-image-2">gpt-image-2 — Potente</option>'
                       + '<option value="gpt-image-1-mini" selected>gpt-image-1-mini — Económico</option>';
       }
     }

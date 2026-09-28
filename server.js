@@ -24,6 +24,10 @@ const { generarSubtitulos } = require('./services/subtitulos');
 const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = require('./services/telegram');
 const yt = require('./services/youtube');
 
+// Timeout por defecto para todas las llamadas axios (los servicios comparten la instancia).
+// Imágenes, Whisper y subidas a Telegram lo amplían a 180 s en su propia llamada.
+require('axios').defaults.timeout = 120_000;
+
 // ── Inicialización ────────────────────────────────────────────────────────────
 crearCarpetas();
 
@@ -46,13 +50,25 @@ const leerPromptCurso = nombre => fs.readFileSync(path.join(DIR_PROMPTS_CURSO, n
 // Los prompts guardados en el frontend usan {placeholder}; renderPrompt espera {{placeholder}}
 const llavesDobles = plantilla => plantilla.replace(/(?<!\{)\{(\w+)\}(?!\})/g, '{{$1}}');
 
-/** Devuelve el siguiente número de secuencia disponible en output/curso/ */
-function cursosiguienteNumero() {
+/**
+ * Reserva el siguiente número de secuencia en output/curso/ creando audio<n>.txt
+ * de forma exclusiva ('wx'), para que dos peticiones simultáneas no obtengan el mismo.
+ */
+function cursoReservarNumero() {
   const archivos = fs.existsSync(DIR_CURSO) ? fs.readdirSync(DIR_CURSO) : [];
   const nums = archivos
     .map(f => { const m = f.match(/^(audio|video)(\d+)\.(mp3|txt|mp4)$/); return m ? parseInt(m[2]) : 0; })
     .filter(n => n > 0);
-  return nums.length ? Math.max(...nums) + 1 : 1;
+  let n = nums.length ? Math.max(...nums) + 1 : 1;
+  for (;;) {
+    try {
+      fs.closeSync(fs.openSync(path.join(DIR_CURSO, `audio${n}.txt`), 'wx'));
+      return n;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      n++;
+    }
+  }
 }
 
 /** Lista todos los archivos de curso ordenados por número descendente */
@@ -194,8 +210,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
   const {
     nicho       = 'motivacion',
     genero,
-    modelo,
-    api         = 'openai',
+    api,
     subtitulos  = false,
     tts,
     estilo,
@@ -206,17 +221,13 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
 
   // Sanitización de inputs del usuario
   const tema     = seg.sanitizarTema(req.body.tema);
-  const cantidad = seg.validarCantidad(req.body.cantidad, 20);
+  const modelo   = seg.normalizarModeloImagen(req.body.modelo);
 
   if (!tema) {
     return res.status(400).json({ error: 'El campo "tema" es obligatorio.' });
   }
-
-  // Validar modelo antes de usarlo en URLs de API (anti-SSRF)
-  try {
-    seg.validarModelo(modelo, api);
-  } catch (e) {
-    return res.status(400).json({ error: e.message });
+  if (api && !['openai', 'google'].includes(api)) {
+    return res.status(400).json({ error: `API de imagen "${api}" no válida.` });
   }
 
   // Validar refImagePath: debe estar dentro de output/referencias/
@@ -260,8 +271,19 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
 
   // Fusionar defaults del nicho con los parámetros enviados por el usuario
   const vozFinal      = genero   || nichoConfig.defaults.voz       || 'femenino';
-  const modeloFinal   = modelo   || nichoConfig.defaults.modeloImagen || 'gpt-image-1';
   const apiFinal      = api      || nichoConfig.defaults.apiImagen  || 'openai';
+  const modeloDefault = apiFinal === 'google' ? seg.MODELO_IMAGEN_GOOGLE_DEFAULT : seg.MODELO_IMAGEN_OPENAI_DEFAULT;
+  // El modelo del nicho solo aplica si corresponde a la API final (p. ej. el usuario forzó google)
+  const modeloNicho   = seg.normalizarModeloImagen(nichoConfig.defaults.modeloImagen);
+  const modeloFinal   = modelo || (api && api !== nichoConfig.defaults.apiImagen ? null : modeloNicho) || modeloDefault;
+  const cantidad      = seg.validarCantidad(req.body.cantidad || nichoConfig.defaults.cantidadImagenes, 20);
+
+  // Validar modelo antes de usarlo en URLs de API (anti-SSRF)
+  try {
+    seg.validarModelo(modeloFinal, apiFinal);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
   const ttsFinal      = tts      || nichoConfig.defaults.tts        || 'google';
   const estiloFinal   = estilo   || nichoConfig.defaults.estilo     || 'cinematico';
   const escenarioFinal = escenario || nichoConfig.defaults.escenario || 'ninguno';
@@ -319,7 +341,7 @@ app.post('/generar', seg.limitarGenerar, async (req, res) => {
           }
           emitirEvento(id, 'subtitulos_generando', {});
           try {
-            const srt = await generarSubtitulos(rutaAudio(id), rutaSubtitulo(id));
+            const srt = await generarSubtitulos(rutaAudio(id), rutaSubtitulo(id), nichoConfig.idioma);
             emitirEvento(id, 'subtitulos_listos', {});
             return srt;
           } catch (errSRT) {
@@ -605,7 +627,8 @@ app.post('/util/audio', seg.limitarGenerar, async (req, res) => {
 // ── POST /util/imagenes-directas — Prompt directo → imágenes (Google o OpenAI) + Telegram ──
 app.post('/util/imagenes-directas', seg.limitarGenerar, async (req, res) => {
   const ts = () => new Date().toTimeString().slice(0, 8);
-  const { modelo, api = 'google', quality = 'medium' } = req.body;
+  const { api = 'google', quality = 'medium' } = req.body;
+  const modelo = seg.normalizarModeloImagen(req.body.modelo);
   const prompt   = seg.sanitizarTema(req.body.prompt);
   const cantidad = seg.validarCantidad(req.body.cantidad ?? 2);
 
@@ -637,8 +660,8 @@ app.post('/util/imagenes-directas', seg.limitarGenerar, async (req, res) => {
 
     try {
       const cantNum = cantidad; // ya validado con validarCantidad()
-      const modeloFinal = modelo || (api === 'google' ? 'imagen-3.0-generate-002' : 'gpt-image-1');
-      const apiNombre = api === 'google' ? 'Google Imagen' : 'OpenAI gpt-image-1';
+      const modeloFinal = modelo || (api === 'google' ? seg.MODELO_IMAGEN_GOOGLE_DEFAULT : seg.MODELO_IMAGEN_OPENAI_DEFAULT);
+      const apiNombre = api === 'google' ? 'Google Imagen' : `OpenAI ${modeloFinal}`;
       console.log(`[${ts()}] Util/imagenes-directas: api=${api} modelo=${modeloFinal} cantidad=${cantNum}`);
 
       emit('progreso', { mensaje: `Generando ${cantNum} imagen${cantNum !== 1 ? 'es' : ''} con ${apiNombre}...` });
@@ -720,10 +743,10 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
   const modo             = req.body.modo === 'video' ? 'video' : 'audio';
   const cantidadImagenes = seg.validarCantidad(req.body.cantidadImagenes ?? 3, 5);
   const apiImagen        = ['openai', 'google'].includes(req.body.apiImagen) ? req.body.apiImagen : 'openai';
-  const MODELOS_IMG_OPENAI = ['gpt-image-1', 'gpt-image-1-mini'];
+  const modeloPedido = seg.normalizarModeloImagen(req.body.modeloImagen);
   const modeloImagen = apiImagen === 'google'
-    ? 'imagen-3.0-generate-002'
-    : (MODELOS_IMG_OPENAI.includes(req.body.modeloImagen) ? req.body.modeloImagen : 'gpt-image-1-mini');
+    ? seg.MODELO_IMAGEN_GOOGLE_DEFAULT
+    : (seg.MODELOS_OPENAI.has(modeloPedido) ? modeloPedido : seg.MODELO_IMAGEN_OPENAI_ECONOMICO);
   // Prompt personalizado: se acepta si viene del frontend (máx. 3000 chars)
   const promptPersonalizado = req.body.promptPersonalizado
     ? String(req.body.promptPersonalizado).trim().slice(0, 3000)
@@ -767,10 +790,11 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
       if (cliente) try { cliente.write(`event: ${evento}\ndata: ${JSON.stringify(datos)}\n\n`); } catch {}
     };
 
+    let rutaTxt = null;
     try {
       // ── PASO 1: Número de secuencia ───────────────────────────────────────
-      const numero = cursosiguienteNumero();
-      const rutaTxt = path.join(DIR_CURSO, `audio${numero}.txt`);
+      const numero = cursoReservarNumero();
+      rutaTxt = path.join(DIR_CURSO, `audio${numero}.txt`);
       const rutaMp3 = path.join(DIR_CURSO, `audio${numero}.mp3`);
       const langName = LANG_NAMES[idioma];
       const varsPrompt = { tema, nivel, idioma_code: idioma, idioma_nombre: langName };
@@ -890,6 +914,8 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
       const mensaje = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message || String(err));
       console.error(`[curso/generar] ERROR:`, mensaje);
       console.error(err?.stack || err);
+      // Liberar el número reservado si el guion nunca llegó a escribirse
+      if (rutaTxt) try { if (fs.statSync(rutaTxt).size === 0) fs.unlinkSync(rutaTxt); } catch {}
       emit('pipeline_error', { mensaje });
     }
   })();
@@ -944,9 +970,10 @@ app.post('/largo/generar', seg.limitarGenerar, async (req, res) => {
   const segNum   = parseInt(req.body.segundosPorImagen);
   const segundosPorImagen = isNaN(segNum) ? LARGO_SEGUNDOS_POR_IMAGEN : Math.min(LARGO_SEG_IMAGEN_MAX, Math.max(LARGO_SEG_IMAGEN_MIN, segNum));
   const apiImagen = req.body.apiImagen === 'google' ? 'google' : 'openai';
+  const modeloPedido = seg.normalizarModeloImagen(req.body.modeloImagen);
   const modeloImagen = apiImagen === 'google'
-    ? 'imagen-3.0-generate-002'
-    : (['gpt-image-1', 'gpt-image-1-mini'].includes(req.body.modeloImagen) ? req.body.modeloImagen : 'gpt-image-1-mini');
+    ? seg.MODELO_IMAGEN_GOOGLE_DEFAULT
+    : (seg.MODELOS_OPENAI.has(modeloPedido) ? modeloPedido : seg.MODELO_IMAGEN_OPENAI_ECONOMICO);
 
   const subirYoutube = (req.body.subirYoutube === true || req.body.subirYoutube === 'true') && modo === 'video';
   const privacidadYoutube = ['public', 'unlisted', 'private'].includes(req.body.privacidadYoutube)
@@ -1128,26 +1155,30 @@ app.get('/youtube/auth', (req, res) => {
   const canales = yt.listarCanalesConfig();
   const canal   = canales.find(c => c.nombre === req.query.canal);
   if (!canal) {
-    return res.status(400).send(`Canal "${req.query.canal}" no encontrado en youtube-channels.json.`);
+    return res.status(400).type('text/plain').send(`Canal "${String(req.query.canal)}" no encontrado en youtube-channels.json.`);
   }
   res.redirect(yt.obtenerUrlAuth(canal.nombre));
 });
+
+const escaparHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ── GET /youtube/callback — Recibe el código OAuth de Google ──────────────────
 app.get('/youtube/callback', async (req, res) => {
   const { code, state } = req.query;
   if (!code || !state) return res.status(400).send('Parámetros faltantes en el callback de OAuth.');
   try {
-    await yt.manejarCallback(code, state);
+    const canal = await yt.manejarCallback(String(code), String(state));
+    const label = yt.listarCanalesConfig().find(c => c.nombre === canal)?.label || canal;
     res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="font-family:system-ui,sans-serif;padding:40px;background:#0d0d0f;color:#e2e8f0;">
-  <h2 style="color:#22c55e;">&#10003; Canal "${state}" autorizado correctamente</h2>
+  <h2 style="color:#22c55e;">&#10003; Canal "${escaparHtml(label)}" autorizado correctamente</h2>
   <p style="color:#94a3b8;margin-top:12px;">Ya puedes cerrar esta pestaña y volver a
     <a href="/videos_curso.html" style="color:#818cf8;">Videos Curso</a>.
   </p>
 </body></html>`);
   } catch (err) {
-    res.status(500).send(`Error al procesar el callback: ${err.message}`);
+    console.error('[youtube/callback]', err.message);
+    res.status(400).type('text/plain').send(`Error al procesar el callback: ${err.message}`);
   }
 });
 

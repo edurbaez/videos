@@ -6,11 +6,13 @@ const { execSync } = require('child_process');
 const { GoogleAuth } = require('google-auth-library');
 require('dotenv').config();
 
+const TIMEOUT_IMAGEN_MS = 180_000;
+
 const { rutaImagen } = require('../utils/archivos');
 const { ESTILOS_ES, ESTILOS_EN, ESCENARIOS_EN } = require('../utils/estilos');
 const { generarStoryboard } = require('./storyboard');
 const { renderPrompt } = require('../utils/prompts');
-const { validarModelo } = require('../middleware/seguridad');
+const { validarModelo, MODELO_IMAGEN_OPENAI_DEFAULT } = require('../middleware/seguridad');
 
 // Galería en memoria: persiste mientras el servidor esté corriendo
 const galeria = [];
@@ -64,17 +66,16 @@ async function generarPromptVisual(guion, n, total, estilo = 'cinematico', escen
 }
 
 /**
- * Llama a OpenAI Images (gpt-image-1, gpt-image-1-mini) con modelo configurable.
- * Modelos soportados: gpt-image-1, gpt-image-1-mini
- * Size portrait 9:16 → 1024x1536 (gpt-image-1 no soporta 1024x1792 de DALL-E 3)
+ * Llama a OpenAI Images con modelo configurable (ver MODELOS_OPENAI en middleware/seguridad.js).
+ * Size portrait 9:16 → 1024x1536 (gpt-image no soporta 1024x1792 de DALL-E 3)
  * Quality: low | medium | high
  *
  * @param {string} promptVisual - Prompt en inglés
- * @param {string} modelo       - Modelo a usar (default: gpt-image-1)
+ * @param {string} modelo       - Modelo a usar (default: gpt-image-2)
  * @param {string} quality      - Calidad: low | medium | high (default: medium)
  * @returns {Buffer} - Buffer de la imagen PNG
  */
-async function llamarOpenAIImagen(promptVisual, modelo = 'gpt-image-1', quality = 'medium', size = '1024x1536') {
+async function llamarOpenAIImagen(promptVisual, modelo = MODELO_IMAGEN_OPENAI_DEFAULT, quality = 'medium', size = '1024x1536') {
   validarModelo(modelo, 'openai');
   let resp;
   try {
@@ -93,6 +94,7 @@ async function llamarOpenAIImagen(promptVisual, modelo = 'gpt-image-1', quality 
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
+        timeout: TIMEOUT_IMAGEN_MS,
       }
     );
   } catch (err) {
@@ -111,11 +113,11 @@ async function llamarOpenAIImagen(promptVisual, modelo = 'gpt-image-1', quality 
  *
  * @param {string} promptVisual  - Prompt en inglés
  * @param {string} refImagePath  - Ruta local de la imagen de referencia
- * @param {string} modelo        - Modelo (gpt-image-1 | gpt-image-1-mini)
+ * @param {string} modelo        - Modelo (ver MODELOS_OPENAI)
  * @param {string} quality       - Calidad: low | medium | high
  * @returns {Buffer} - Buffer de la imagen PNG
  */
-async function llamarOpenAIImagenEdits(promptVisual, refImagePath, modelo = 'gpt-image-1', quality = 'medium') {
+async function llamarOpenAIImagenEdits(promptVisual, refImagePath, modelo = MODELO_IMAGEN_OPENAI_DEFAULT, quality = 'medium') {
   validarModelo(modelo, 'openai');
   const form = new FormData();
   const ext = path.extname(refImagePath).toLowerCase();
@@ -141,6 +143,7 @@ async function llamarOpenAIImagenEdits(promptVisual, refImagePath, modelo = 'gpt
           ...form.getHeaders(),
         },
         maxBodyLength: Infinity,
+        timeout: TIMEOUT_IMAGEN_MS,
       }
     );
   } catch (err) {
@@ -197,6 +200,7 @@ async function llamarGoogleImagen(promptVisual, modelo = 'imagen-3.0-generate-00
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        timeout: TIMEOUT_IMAGEN_MS,
       }
     );
   } catch (err) {
@@ -441,7 +445,7 @@ async function generarTodosPrompts(guion, cantidad, estilo = 'cinematico', escen
  * Genera imágenes una por una (secuencial).
  * Llama onCadaImagen(n, ruta, urlPublica) después de guardar cada una.
  */
-async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, nichoConfig, modelo = 'gpt-image-1', quality = 'medium') {
+async function generarImagenesSecuencial(guion, cantidad, id, onCadaImagen, onPrompt, estilo = 'cinematico', escenario = 'ninguno', onStoryboard = null, nichoConfig, modelo = MODELO_IMAGEN_OPENAI_DEFAULT, quality = 'medium') {
   const ts = () => new Date().toTimeString().slice(0, 8);
 
   let prompts;

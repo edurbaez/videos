@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const fs          = require('fs');
 const path        = require('path');
 const axios       = require('axios');
+const crypto      = require('crypto');
 
 const CHANNELS_CONFIG = path.join(__dirname, '..', 'youtube-channels.json');
 const SCOPES = [
@@ -17,8 +18,13 @@ const LANG_NAMES = {
 // ── OAuth helpers ─────────────────────────────────────────────────────────────
 
 function tokenPath(canal) {
+  if (!/^[\w-]+$/.test(canal)) throw new Error(`Nombre de canal inválido: "${canal}".`);
   return path.join(__dirname, '..', `youtube-tokens-${canal}.json`);
 }
+
+// state OAuth de un solo uso → canal (protege contra CSRF y evita confiar en el valor que vuelve de Google)
+const STATE_TTL_MS = 10 * 60 * 1000;
+const estadosOAuth = new Map();
 
 function crearCliente() {
   return new google.auth.OAuth2(
@@ -29,20 +35,38 @@ function crearCliente() {
 }
 
 function obtenerUrlAuth(canal) {
+  tokenPath(canal);
+  const state = crypto.randomUUID();
+  const timer = setTimeout(() => estadosOAuth.delete(state), STATE_TTL_MS);
+  timer.unref();
+  estadosOAuth.set(state, { canal, timer });
   const client = crearCliente();
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent',
-    state: canal,
+    state,
   });
 }
 
-async function manejarCallback(code, canal) {
+/** Consume el state y devuelve el canal asociado; lanza si es inválido, expiró o el canal ya no existe. */
+function consumirEstadoOAuth(state) {
+  const entrada = typeof state === 'string' ? estadosOAuth.get(state) : null;
+  if (!entrada) throw new Error('Estado OAuth inválido o expirado. Vuelve a iniciar la autorización.');
+  clearTimeout(entrada.timer);
+  estadosOAuth.delete(state);
+  if (!leerCanalesConfig().some(c => c.nombre === entrada.canal)) {
+    throw new Error('El canal ya no existe en youtube-channels.json.');
+  }
+  return entrada.canal;
+}
+
+async function manejarCallback(code, state) {
+  const canal = consumirEstadoOAuth(state);
   const client = crearCliente();
   const { tokens } = await client.getToken(code);
   fs.writeFileSync(tokenPath(canal), JSON.stringify(tokens, null, 2));
-  return tokens;
+  return canal;
 }
 
 function cargarTokens(canal) {
@@ -72,7 +96,9 @@ function leerCanalesConfig() {
   if (!fs.existsSync(CHANNELS_CONFIG)) return [];
   try {
     const data = JSON.parse(fs.readFileSync(CHANNELS_CONFIG, 'utf-8'));
-    return Array.isArray(data.canales) ? data.canales : [];
+    return Array.isArray(data.canales)
+      ? data.canales.filter(c => typeof c?.nombre === 'string' && /^[\w-]+$/.test(c.nombre))
+      : [];
   } catch {
     return [];
   }

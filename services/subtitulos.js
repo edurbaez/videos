@@ -8,16 +8,17 @@ require('dotenv').config();
  *
  * @param {string} rutaAudio    - Ruta absoluta del archivo MP3
  * @param {string} rutaDestino  - Ruta absoluta donde guardar el archivo .srt
+ * @param {string} idioma       - Código ISO-639-1 del audio (idioma del nicho)
  * @returns {string} - Ruta del archivo SRT guardado
  */
-async function generarSubtitulos(rutaAudio, rutaDestino) {
+async function generarSubtitulos(rutaAudio, rutaDestino, idioma = 'es') {
   const ts = () => new Date().toTimeString().slice(0, 8);
   console.log(`[${ts()}] Subtitulos: enviando audio a Whisper API...`);
 
   const form = new FormData();
   form.append('file', fs.createReadStream(rutaAudio));
   form.append('model', 'whisper-1');
-  form.append('language', 'es');
+  form.append('language', /^[a-z]{2}$/.test(idioma) ? idioma : 'es');
   form.append('response_format', 'srt');
 
   const resp = await axios.post(
@@ -30,6 +31,7 @@ async function generarSubtitulos(rutaAudio, rutaDestino) {
       },
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
+      timeout: 180_000,
     }
   );
 

@@ -179,7 +179,7 @@ LARGO_SEGUNDOS_ENTRE_IMAGENES (opcional — separación mínima entre peticiones
 
 ## Notas de modelos / APIs externas
 
-⚠ **`gpt-image-1` se retira el 23 de octubre de 2026** (OpenAI). Afecta a `services/imagenes.js` (`MODELOS_IMG_OPENAI = ['gpt-image-1', 'gpt-image-1-mini']`, imagenes.js:718 en server.js) y a `/curso/generar`. Migrar a `gpt-image-1.5` antes de esa fecha o dejar `gpt-image-1-mini` (no afectado) como único modelo soportado.
+**Modelos de imagen**: la lista de modelos permitidos y los defaults viven solo en `middleware/seguridad.js` (`MODELOS_OPENAI`, `MODELO_IMAGEN_*`). `gpt-image-1` (retirado el 23-oct-2026) ya no se usa: `normalizarModeloImagen` lo trata como alias de `gpt-image-2`.
 
 **Revisión periódica de APIs**: revisar cada 30 días el estado/pricing/deprecations de OpenAI (GPT-4o, gpt-image-1, gpt-image-1-mini, Whisper) y Google Cloud (Text-to-Speech Neural2, Imagen 3, Vertex AI).
 - Última revisión: 2026-09-14

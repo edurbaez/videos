@@ -3,6 +3,8 @@ const fs = require('fs');
 const FormData = require('form-data');
 require('dotenv').config();
 
+const TIMEOUT_SUBIDA_MS = 180_000;
+
 /**
  * Envía el caption y el video a un canal/chat de Telegram en dos pasos:
  *  1. Mensaje de texto con el caption
@@ -31,13 +33,15 @@ async function enviarATelegram(rutaVideo, caption) {
   const form = new FormData();
   form.append('chat_id', chatId);
   form.append('video', fs.createReadStream(rutaVideo));
-  form.append('caption', caption);
+  // Telegram rechaza el video entero si el caption supera 1024 caracteres; el completo ya se envió como texto
+  form.append('caption', caption.length > 1024 ? caption.slice(0, 1021) + '...' : caption);
   form.append('supports_streaming', 'true');
 
   await axios.post(`${base}/sendVideo`, form, {
     headers: form.getHeaders(),
     maxContentLength: Infinity,
     maxBodyLength: Infinity,
+    timeout: TIMEOUT_SUBIDA_MS,
   });
 
   console.log(`[${ts()}] Telegram: video enviado correctamente.`);
@@ -52,7 +56,7 @@ async function enviarTexto(texto) {
   const ts = () => new Date().toTimeString().slice(0, 8);
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
-  console.log(`[${ts()}] Telegram: enviando texto... (chat_id=${chatId}, token=${token?.slice(0,10)}...)`);
+  console.log(`[${ts()}] Telegram: enviando texto... (chat_id=${chatId})`);
   // Telegram permite máx 4096 caracteres por mensaje
   const textoTruncado = texto.length > 4096 ? texto.slice(0, 4090) + '...' : texto;
 
@@ -100,6 +104,7 @@ async function enviarFotos(rutasImagenes) {
       headers: form.getHeaders(),
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
+      timeout: TIMEOUT_SUBIDA_MS,
     });
     console.log(`[${ts()}] Telegram: fotos enviadas.`);
   }
@@ -122,6 +127,7 @@ async function enviarFoto(ruta) {
       headers: form.getHeaders(),
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
+      timeout: TIMEOUT_SUBIDA_MS,
     });
     console.log(`[${ts()}] Telegram: foto enviada.`);
   } catch (err) {
@@ -150,6 +156,7 @@ async function enviarAudio(ruta, caption = '') {
       headers: form.getHeaders(),
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
+      timeout: TIMEOUT_SUBIDA_MS,
     });
     console.log(`[${ts()}] Telegram: audio enviado.`);
   } catch (err) {

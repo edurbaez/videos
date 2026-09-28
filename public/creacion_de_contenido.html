@@ -676,7 +676,7 @@
         <div class="field-sm">
           <label for="v_inputModelo">Modelo de imagen</label>
           <select id="v_inputModelo">
-            <option value="gpt-image-1">gpt-image-1 (calidad alta)</option>
+            <option value="gpt-image-2">gpt-image-2 (calidad alta)</option>
             <option value="gpt-image-1-mini">gpt-image-1-mini (económico)</option>
             <option value="imagen-3.0-generate-002">Google Imagen 3</option>
           </select>
@@ -1201,7 +1201,7 @@ document.getElementById('v_btnGenerar').addEventListener('click', async () => {
   const nicho    = document.getElementById('v_inputNicho').value;
   const cantidad = document.getElementById('v_inputCantidad').value;
   const modelo   = document.getElementById('v_inputModelo').value;
-  const apiMap   = { 'gpt-image-1':'openai', 'gpt-image-1-mini':'openai', 'imagen-3.0-generate-002':'google', 'imagen-4.0-generate-preview-05-20':'google' };
+  const apiMap   = { 'gpt-image-2':'openai', 'gpt-image-1-mini':'openai', 'imagen-3.0-generate-002':'google', 'imagen-4.0-generate-preview-05-20':'google' };
   const api      = apiMap[modelo] || 'openai';
 
   if (!tema) { vMostrarError('Escribe el tema del video antes de continuar.'); return; }

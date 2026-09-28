@@ -115,11 +115,20 @@ function validarFechaProgramada(valor) {
 // ─────────────────────────────────────────────────────────────────────────────
 // El modelo se interpola en URLs de Vertex AI y OpenAI.
 // Solo se permiten los modelos conocidos para evitar SSRF.
+// Fuente única de modelos de imagen. gpt-image-1 se retira el 23-oct-2026:
+// se acepta como alias de gpt-image-2 para no romper formularios/estado guardado.
 const MODELOS_OPENAI = new Set([
   'gpt-image-2',
-  'gpt-image-1',
   'gpt-image-1-mini',
 ]);
+const MODELO_IMAGEN_OPENAI_DEFAULT = 'gpt-image-2';
+const MODELO_IMAGEN_OPENAI_ECONOMICO = 'gpt-image-1-mini';
+const MODELO_IMAGEN_GOOGLE_DEFAULT = 'imagen-3.0-generate-002';
+const ALIAS_MODELOS = { 'gpt-image-1': 'gpt-image-2' };
+
+function normalizarModeloImagen(modelo) {
+  return ALIAS_MODELOS[modelo] || modelo;
+}
 const MODELOS_GOOGLE = new Set([
   'imagen-3.0-generate-002',
   'imagen-3.0-generate-001',
@@ -189,6 +198,11 @@ module.exports = {
   validarCantidad,
   validarFechaProgramada,
   validarModelo,
+  normalizarModeloImagen,
+  MODELOS_OPENAI,
+  MODELO_IMAGEN_OPENAI_DEFAULT,
+  MODELO_IMAGEN_OPENAI_ECONOMICO,
+  MODELO_IMAGEN_GOOGLE_DEFAULT,
   verificarMagicBytes,
   MAX_SSE_CLIENTES,
   mensajeError,
