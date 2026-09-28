@@ -20,6 +20,12 @@ const MAX_CHARS_TEXTO = 60;
 // Por debajo de esta fracción del objetivo, la última escena de una sección se funde con la anterior
 const FRACCION_MINIMA = 0.4;
 
+const FORMATOS = {
+  horizontal: { composicion: 'Horizontal 16:9 composition.', google: '16:9', openai: '1536x1024', ancho: 1920, alto: 1080, fuente: 64, margenV: 70, margenH: 160 },
+  vertical:   { composicion: 'Vertical 9:16 composition.',   google: '9:16', openai: '1024x1536', ancho: 1080, alto: 1920, fuente: 72, margenV: 260, margenH: 80 },
+};
+const formatoDe = orientacion => FORMATOS[orientacion] || FORMATOS.horizontal;
+
 const leerPrompt = nombre => fs.readFileSync(path.join(DIR_PROMPTS, nombre), 'utf-8');
 
 async function ejecutarConLimite(tareas, limite) {
@@ -128,12 +134,12 @@ async function dirigirArte(escenas, ctx) {
   return guia;
 }
 
-function componerPrompt(guia, escena) {
+function componerPrompt(guia, escena, orientacion) {
   return `${textoGuia(guia)}
 
 Scene: ${escena.prompt}
 
-Strict rules: absolutely no text, letters, words, numbers, labels or logos anywhere in the image. Horizontal 16:9 composition. Keep the bottom fifth of the frame visually calm, a caption will be overlaid there.`;
+Strict rules: absolutely no text, letters, words, numbers, labels or logos anywhere in the image. ${formatoDe(orientacion).composicion} Keep the bottom fifth of the frame visually calm, a caption will be overlaid there.`;
 }
 
 const esperar = ms => new Promise(r => setTimeout(r, ms));
@@ -148,8 +154,8 @@ function esBloqueoContenido(err) {
   return /filtro de seguridad|moderation|safety|content_policy/i.test(err.message || '');
 }
 
-async function generarEscena(e, guia, generar, ruta) {
-  let prompt = componerPrompt(guia, e);
+async function generarEscena(e, guia, generar, ruta, orientacion) {
+  let prompt = componerPrompt(guia, e, orientacion);
   for (let intento = 1; intento <= INTENTOS_IMAGEN; intento++) {
     try {
       fs.writeFileSync(ruta, await generar(prompt));
@@ -161,7 +167,7 @@ async function generarEscena(e, guia, generar, ruta) {
       console.error(`[escenasLargo] escena ${e.n} intento ${intento}: ${err.message}`);
       if (esBloqueoContenido(err)) {
         // Fall back to the style guide alone: the scene prompt is what usually trips the filter.
-        prompt = `${guia.estilo}\n\nScene: a calm, neutral classroom or study setting that fits the lesson mood.\n\nNo text, letters or logos. Horizontal 16:9 composition.`;
+        prompt = `${guia.estilo}\n\nScene: a calm, neutral classroom or study setting that fits the lesson mood.\n\nNo text, letters or logos. ${formatoDe(orientacion).composicion}`;
       } else if (!esTransitorio(err)) {
         return;
       }
@@ -177,7 +183,8 @@ async function generarEscena(e, guia, generar, ruta) {
  * Genera una imagen por escena con backoff ante límites de cuota y una pasada de rescate
  * secuencial para las fallidas. Lo que siga fallando reutiliza la imagen vecina.
  */
-async function generarImagenesEscenas(escenas, guia, { apiImagen, modeloImagen, dir }, onProgreso) {
+async function generarImagenesEscenas(escenas, guia, { apiImagen, modeloImagen, dir, orientacion, calidad = 'medium' }, onProgreso) {
+  const formato = formatoDe(orientacion);
   fs.mkdirSync(dir, { recursive: true });
   // Reserves start slots synchronously, so concurrent workers and retries share one timeline.
   let proximoInicio = 0;
@@ -187,14 +194,14 @@ async function generarImagenesEscenas(escenas, guia, { apiImagen, modeloImagen, 
     proximoInicio = inicio + MS_ENTRE_IMAGENES;
     if (inicio > ahora) await esperar(inicio - ahora);
     return apiImagen === 'google'
-      ? llamarGoogleImagen(prompt, modeloImagen, '16:9')
-      : llamarOpenAIImagen(prompt, modeloImagen, 'medium', '1536x1024');
+      ? llamarGoogleImagen(prompt, modeloImagen, formato.google)
+      : llamarOpenAIImagen(prompt, modeloImagen, calidad, formato.openai);
   };
   const rutaDe = e => path.join(dir, `escena-${String(e.n).padStart(3, '0')}.png`);
 
   let hechos = 0;
   await ejecutarConLimite(escenas.map(e => async () => {
-    await generarEscena(e, guia, generar, rutaDe(e));
+    await generarEscena(e, guia, generar, rutaDe(e), orientacion);
     hechos++;
     if (onProgreso) onProgreso(hechos, escenas.length);
   }), CONCURRENCIA_IMAGENES);
@@ -203,7 +210,7 @@ async function generarImagenesEscenas(escenas, guia, { apiImagen, modeloImagen, 
   if (pendientes.length) {
     console.warn(`[escenasLargo] rescate: ${pendientes.length} escenas fallidas, reintentando en serie`);
     await esperar(PAUSA_RESCATE_MS);
-    for (const e of pendientes) await generarEscena(e, guia, generar, rutaDe(e));
+    for (const e of pendientes) await generarEscena(e, guia, generar, rutaDe(e), orientacion);
   }
 
   const conImagen = escenas.filter(e => e.imagen);
@@ -224,7 +231,8 @@ function tiempoAss(seg) {
 }
 
 /** Escribe el archivo ASS con el texto clave de cada escena (caja semitransparente abajo al centro). */
-function escribirAss(escenas, rutaAss, ancho = 1920, alto = 1080) {
+function escribirAss(escenas, rutaAss, orientacion) {
+  const { ancho, alto, fuente, margenV, margenH } = formatoDe(orientacion);
   const eventos = escenas
     .filter(e => e.textoPantalla && e.fin - e.inicio > 1.5)
     .map(e => `Dialogue: 0,${tiempoAss(e.inicio + 0.4)},${tiempoAss(e.fin - 0.3)},Clave,,0,0,0,,{\\fad(300,300)}${e.textoPantalla}`);
@@ -238,7 +246,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Clave,Arial,64,&H00FFFFFF,&H00FFFFFF,&H60000000,&H60000000,1,0,0,0,100,100,0,0,3,20,0,2,160,160,70,1
+Style: Clave,Arial,${fuente},&H00FFFFFF,&H00FFFFFF,&H60000000,&H60000000,1,0,0,0,100,100,0,0,3,20,0,2,${margenH},${margenH},${margenV},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -248,4 +256,4 @@ ${eventos.join('\n')}
   return eventos.length;
 }
 
-module.exports = { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss };
+module.exports = { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss, FORMATOS };

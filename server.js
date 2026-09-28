@@ -14,11 +14,12 @@ const { listarNichos, cargarNicho } = require('./services/nichos');
 const { generarGuion } = require('./services/guion');
 const { generarCaption } = require('./services/caption');
 const { generarAudio, resolverVozGoogle } = require('./services/audio');
-const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, generarEsquemaInfografia, obtenerGaleria } = require('./services/imagenes');
+const { generarImagenes, generarImagenesSecuencial, generarImagenesDirectas, obtenerGaleria } = require('./services/imagenes');
 const { generarVideo, generarVideoEscenas } = require('./services/video');
-const { generarGuionLargo, limpiarEtiquetas, planificar, PALABRAS_POR_MINUTO } = require('./services/guionLargo');
+const { generarGuionLargo, limpiarEtiquetas, planificar, chat, LANG_NAMES, PALABRAS_POR_MINUTO } = require('./services/guionLargo');
 const { generarAudioLargo, formatearTiempo } = require('./services/audioLargo');
-const { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss } = require('./services/escenasLargo');
+const { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss, FORMATOS } = require('./services/escenasLargo');
+const { renderPrompt } = require('./utils/prompts');
 const { generarSubtitulos } = require('./services/subtitulos');
 const { enviarATelegram, enviarTexto, enviarFotos, enviarFoto, enviarAudio } = require('./services/telegram');
 const yt = require('./services/youtube');
@@ -39,10 +40,11 @@ const LARGO_SEG_IMAGEN_MIN = 10;
 const LARGO_SEG_IMAGEN_MAX = 120;
 const LARGO_SEGUNDOS_POR_IMAGEN = Math.min(LARGO_SEG_IMAGEN_MAX, Math.max(LARGO_SEG_IMAGEN_MIN, parseInt(process.env.LARGO_SEGUNDOS_POR_IMAGEN) || 30));
 
-const CURSO_LANG_NAMES = {
-  de: 'German (Deutsch)', en: 'English', es: 'Spanish (Español)',
-  fr: 'French (Français)', pt: 'Portuguese (Português)',
-};
+const DIR_PROMPTS_CURSO = path.join(__dirname, 'prompts', 'curso');
+const leerPromptCurso = nombre => fs.readFileSync(path.join(DIR_PROMPTS_CURSO, nombre), 'utf-8');
+
+// Los prompts guardados en el frontend usan {placeholder}; renderPrompt espera {{placeholder}}
+const llavesDobles = plantilla => plantilla.replace(/(?<!\{)\{(\w+)\}(?!\})/g, '{{$1}}');
 
 /** Devuelve el siguiente número de secuencia disponible en output/curso/ */
 function cursosiguienteNumero() {
@@ -72,20 +74,6 @@ function cursoListarArchivos() {
       texto,
     };
   });
-}
-
-/** Divide un guion en N segmentos contiguos de oraciones, para generar una infografía por segmento. */
-function dividirGuionEnSegmentos(guion, n) {
-  const oraciones = guion.match(/[^.!?]+[.!?]*/g)?.map(s => s.trim()).filter(Boolean) || [guion];
-  if (n <= 1 || oraciones.length <= n) {
-    return n <= 1 ? [guion] : oraciones.concat(Array(n - oraciones.length).fill(oraciones[oraciones.length - 1]));
-  }
-  const porSegmento = Math.ceil(oraciones.length / n);
-  const segmentos = [];
-  for (let i = 0; i < n; i++) {
-    segmentos.push(oraciones.slice(i * porSegmento, (i + 1) * porSegmento).join(' ').trim());
-  }
-  return segmentos.filter(Boolean).length === n ? segmentos : segmentos.map(s => s || guion);
 }
 
 // Multer para subida de imagen de referencia
@@ -784,141 +772,78 @@ app.post('/curso/generar', seg.limitarGenerar, async (req, res) => {
       const numero = cursosiguienteNumero();
       const rutaTxt = path.join(DIR_CURSO, `audio${numero}.txt`);
       const rutaMp3 = path.join(DIR_CURSO, `audio${numero}.mp3`);
-      const langName = CURSO_LANG_NAMES[idioma];
+      const langName = LANG_NAMES[idioma];
+      const varsPrompt = { tema, nivel, idioma_code: idioma, idioma_nombre: langName };
 
       emit('progreso', { paso: 1, mensaje: `Generando guion en ${langName}...` });
       console.log(`[${ts()}] Curso: generando audio${numero} idioma=${idioma} genero=${genero} tema="${tema}"`);
 
-      // ── PASO 2: Guion con OpenAI ──────────────────────────────────────────
-      const palabrasLine = palabras
+      // ── PASO 2: Guion ─────────────────────────────────────────────────────
+      const palabrasLinea = palabras
         ? `\n⚠ PRIORITY REQUIREMENT — You MUST use ALL of the following words or phrases at least once in the script. This is mandatory, not optional:\n${palabras}\nBuild the script around these words whenever possible.\n`
         : '';
-      const promptDefault = `You are a professional online course instructor. Write a spoken script for a short educational video about the topic below.\n\n⚠ MANDATORY LANGUAGE REQUIREMENT: The ENTIRE output must be written 100% in ${langName}, with zero exceptions. This applies regardless of the language used in these instructions or in the topic below — translate the topic into ${langName} if needed. Do NOT mix in English or any other language, not even single words, names of concepts, or transition phrases.\n\nRules:\n- The script must be entirely in ${langName} (see requirement above).\n- Language level: ${nivel} — adjust vocabulary, sentence complexity, and grammar accordingly.\n- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.\n- Target length: 150–220 words (approximately 1–2 minutes when spoken).\n- Write ONLY the spoken text, nothing else, entirely in ${langName}.\n${palabrasLine}\nTopic: ${tema}`;
-      const promptGuion = promptPersonalizado || promptDefault;
-
-      const respGuion = await require('axios').post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: promptGuion }],
-          temperature: 0.8,
-          max_tokens: 800,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const guionBorrador = respGuion.data.choices[0].message.content.trim();
+      const promptGuion = promptPersonalizado
+        || renderPrompt(leerPromptCurso('guion.txt'), { ...varsPrompt, palabras_linea: palabrasLinea });
+      const guionBorrador = await chat(promptGuion, { maxTokens: 800, temperature: 0.8 });
       emit('guion_listo', { numero, guion: guionBorrador });
       console.log(`[${ts()}] Curso: borrador generado (${guionBorrador.length} chars)`);
 
       // ── PASO 2b: Humanización del guion ──────────────────────────────────
       emit('progreso', { paso: 2, mensaje: 'Humanizando y ajustando guion para audio...' });
-
-      const HUMANIZACION_DEFAULT = `You are a voice-over script editor specialized in text-to-speech optimization. Revise the following script to make it sound more natural and fluid when read aloud.
-
-⚠ MANDATORY LANGUAGE REQUIREMENT: The revised script must remain 100% in {idioma_nombre}, with zero exceptions, regardless of the language of these instructions. Do NOT translate, mix in, or switch to any other language.
-
-Rules:
-- Keep the exact same language ({idioma_nombre}), topic, and language level as the original.
-- Replace formal or rigid sentence structures with natural spoken patterns.
-- Add smooth transitions and connective phrases between ideas.
-- Vary sentence length to create a natural spoken rhythm.
-- Avoid lists, colons, semicolons, academic phrasing, and abrupt topic shifts.
-- Do NOT add new content, change the meaning, or alter the target language.
-- Output ONLY the revised script text, nothing else, entirely in {idioma_nombre}.
-
-Script to revise:
-{guion}`;
-
-      const promptHumanizacionFinal = (promptHumanizacion || HUMANIZACION_DEFAULT)
-        .replace(/\{guion\}/g, guionBorrador)
-        .replace(/\{idioma_code\}/g, idioma)
-        .replace(/\{idioma_nombre\}/g, langName);
-
-      const respHuman = await require('axios').post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: promptHumanizacionFinal }],
-          temperature: 0.6,
-          max_tokens: 900,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
+      const plantillaHumanizacion = promptHumanizacion
+        ? llavesDobles(promptHumanizacion)
+        : leerPromptCurso('humanizacion.txt');
+      const guion = await chat(
+        renderPrompt(plantillaHumanizacion, { ...varsPrompt, guion: guionBorrador }),
+        { maxTokens: 900, temperature: 0.6 }
       );
-
-      const guion = respHuman.data.choices[0].message.content.trim();
       fs.writeFileSync(rutaTxt, guion, 'utf-8');
       emit('revision_lista', { numero, guion, rutaTxt: `/output/curso/audio${numero}.txt` });
       console.log(`[${ts()}] Curso: guion humanizado guardado en ${rutaTxt}`);
 
-      // ── PASO 3: Audio con Google TTS ──────────────────────────────────────
+      // ── PASO 3: Audio con Google TTS (con línea de tiempo por oración) ────
       emit('progreso', { paso: 3, mensaje: `Sintetizando audio ${idioma} (${genero})...` });
-
-      const { nombreVoz, langCode } = resolverVozGoogle(idioma, genero);
-      await generarAudio(guion, rutaMp3, genero, 'google', idioma);
-      emit('audio_listo', { numero, rutaMp3: `/output/curso/audio${numero}.mp3`, nombreVoz, langCode });
-      console.log(`[${ts()}] Curso: audio guardado en ${rutaMp3}`);
-
-      // ── PASO 4 (opcional): Imágenes + Video ───────────────────────────────
+      const dirTrabajo = path.join(DIR_CURSO, `trabajo-${id}`);
       let rutaVideoCurso = null;
-      if (modo === 'video') {
-        // — Imágenes —
-        emit('progreso', { paso: 4, mensaje: `Analizando contenido de ${cantidadImagenes} infografía(s)...` });
-        console.log(`[${ts()}] Curso: analizando esquemas de infografía...`);
+      try {
+        const { nombreVoz, langCode } = resolverVozGoogle(idioma, genero);
+        const audio = await generarAudioLargo([{ titulo: tema, texto: guion }], rutaMp3, {
+          formato: 'monologo', genero, tts: 'google', idioma, dirTrabajo,
+        });
+        emit('audio_listo', { numero, rutaMp3: `/output/curso/audio${numero}.mp3`, nombreVoz, langCode });
+        console.log(`[${ts()}] Curso: audio guardado en ${rutaMp3}`);
 
-        const segmentosGuion = dividirGuionEnSegmentos(guion, cantidadImagenes);
-        const esquemas = await Promise.all(
-          segmentosGuion.map((segmento) => generarEsquemaInfografia(segmento, tema, nivel, langName))
-        );
-        console.log(`[${ts()}] Curso: ${esquemas.length} esquema(s) de infografía generados.`);
+        // ── PASO 4 (opcional): Director de arte + imágenes + video vertical ─
+        if (modo === 'video') {
+          const escenas = agruparEscenas(audio.segmentos, audio.duracionTotal / cantidadImagenes, audio.duracionTotal);
+          emit('progreso', { paso: 4, mensaje: `Director de arte: guía de estilo y prompts para ${escenas.length} escena(s)...` });
+          const guia = await dirigirArte(escenas, {
+            titulo: tema, tema, idioma, nivel, formato: 'monologo', secciones: [{ titulo: tema }],
+          });
 
-        emit('progreso', { paso: 4, mensaje: `Generando ${cantidadImagenes} imagen(es) con ${apiImagen}...` });
-        console.log(`[${ts()}] Curso: iniciando imágenes api=${apiImagen} modelo=${modeloImagen} cantidad=${cantidadImagenes}`);
+          emit('progreso', { paso: 4, mensaje: `Generando ${escenas.length} imagen(es) con ${apiImagen}...` });
+          console.log(`[${ts()}] Curso: iniciando imágenes api=${apiImagen} modelo=${modeloImagen} escenas=${escenas.length}`);
+          await generarImagenesEscenas(escenas, guia, {
+            apiImagen, modeloImagen, dir: path.join(DIR_CURSO, `video${numero}-img`), orientacion: 'vertical', calidad: 'high',
+          }, (hechos, total) => {
+            emit('imagen_lista', { n: hechos, total });
+            console.log(`[${ts()}] Curso: imagen ${hechos}/${total} lista.`);
+          });
 
-        const promptsImagen = segmentosGuion.map((segmento, i) =>
-          `Professional educational infographic for an online course video about "${tema}", clearly explaining this specific idea from the script: "${segmento}". Language level ${nivel}. Specific content to depict: ${esquemas[i]}. All text, labels, captions, and signage must be short, legible, and written entirely in ${langName}, never in English or any other language, regardless of the language of this prompt. Clean modern layout, high contrast, well-organized composition. Suitable for e-learning.`
-        );
+          emit('progreso', { paso: 5, mensaje: 'Renderizando video con FFmpeg...' });
+          rutaVideoCurso = path.join(DIR_CURSO, `video${numero}.mp4`);
+          const rutaAss = path.join(dirTrabajo, 'textos.ass');
+          const conTexto = escribirAss(escenas, rutaAss, 'vertical');
+          const { ancho, alto } = FORMATOS.vertical;
+          await generarVideoEscenas(rutaMp3, escenas, rutaVideoCurso, {
+            rutaAss: conTexto ? rutaAss : null, dirTrabajo, ancho, alto,
+          });
 
-        let rutasOrdenadas;
-        try {
-          rutasOrdenadas = await generarImagenesDirectas(
-            promptsImagen, cantidadImagenes, id, modeloImagen, apiImagen,
-            async (n, _ruta) => {
-              emit('imagen_lista', { n, total: cantidadImagenes });
-              console.log(`[${ts()}] Curso: imagen ${n}/${cantidadImagenes} lista.`);
-            },
-            null, 'high'
-          );
-        } catch (errImg) {
-          throw new Error(`Error en imágenes: ${errImg.message}`);
+          emit('video_listo', { numero, video: `/output/curso/video${numero}.mp4` });
+          console.log(`[${ts()}] Curso: video guardado en ${rutaVideoCurso}`);
         }
-
-        if (!rutasOrdenadas || rutasOrdenadas.length === 0) {
-          throw new Error('generarImagenesDirectas devolvió un array vacío.');
-        }
-        console.log(`[${ts()}] Curso: ${rutasOrdenadas.length} imágenes listas. Iniciando FFmpeg...`);
-
-        // — Video —
-        emit('progreso', { paso: 5, mensaje: 'Renderizando video con FFmpeg...' });
-        rutaVideoCurso = path.join(DIR_CURSO, `video${numero}.mp4`);
-        try {
-          await generarVideo(rutaMp3, rutasOrdenadas, rutaVideoCurso, null);
-        } catch (errVid) {
-          throw new Error(`Error FFmpeg: ${errVid.message}`);
-        }
-
-        emit('video_listo', { numero, video: `/output/curso/video${numero}.mp4` });
-        console.log(`[${ts()}] Curso: video guardado en ${rutaVideoCurso}`);
+      } finally {
+        fs.rm(dirTrabajo, { recursive: true, force: true }, () => {});
       }
 
       // ── PASO YouTube (opcional) ───────────────────────────────────────────

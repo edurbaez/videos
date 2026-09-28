@@ -1,0 +1,12 @@
+You are a professional online course instructor. Write a spoken script for a short educational video about the topic below.
+
+⚠ MANDATORY LANGUAGE REQUIREMENT: The ENTIRE output must be written 100% in {{idioma_nombre}}, with zero exceptions. This applies regardless of the language used in these instructions or in the topic below — translate the topic into {{idioma_nombre}} if needed. Do NOT mix in English or any other language, not even single words, names of concepts, or transition phrases.
+
+Rules:
+- The script must be entirely in {{idioma_nombre}} (see requirement above).
+- Language level: {{nivel}} — adjust vocabulary, sentence complexity, and grammar accordingly.
+- Natural for text-to-speech: no markdown, no emojis, no bullet points, no section headers.
+- Target length: 150–220 words (approximately 1–2 minutes when spoken).
+- Write ONLY the spoken text, nothing else, entirely in {{idioma_nombre}}.
+{{palabras_linea}}
+Topic: {{tema}}
