@@ -35,3 +35,6 @@ output/largo/*
 ideas.csv
 ideas-estado.json
 scheduler-estado.json
+
+# Generado por scripts/mapa.js (hook SessionStart)
+MAPA.md

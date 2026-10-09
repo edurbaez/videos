@@ -10,7 +10,11 @@ Below are {{cantidad}} consecutive scenes with the text spoken during each one (
 {{escenas}}
 
 For EACH scene write:
-1. "prompt": the scene description for the image model, in English, 40-80 words. Describe subject, action, composition and the concrete visual metaphor that explains what is being said (e.g. a person pointing at a clock for time expressions, arrows showing word order, objects for vocabulary). Visual variety between consecutive scenes (change framing, subject or metaphor) while staying in the same style. Never ask for written text, letters, labels or numbers inside the image.
+1. "prompt": the scene description for the image model, in English, 40-80 words. Describe subject, action, composition and the concrete visual metaphor that explains what is being said (e.g. a person pointing at a clock for time expressions, objects for vocabulary, characters acting out the situation of the example sentence). Visual variety between consecutive scenes (change framing, subject or metaphor) while staying in the same style.
+   The image model draws literally every word you name as text, so the prompt must be 100% visual:
+   - NEVER include {{idioma}} words, example sentences, letters, numbers, grammar terms used as labels, or any word inside quotes (no 'zu', no "wichtig", no „…“). Never write "labeled", "with the word", "saying", "titled", "sign that reads".
+   - Express grammar with pure visual metaphors: colored shapes or blocks that snap together, plain arrows without letters, puzzle pieces, a train of wagons for word order, a person reaching for a goal for purpose, a clock or calendar for time, objects and characters performing the action.
+   - Speech or thought bubbles, signs, books, boards and screens must be empty or contain only simple icons/pictograms.
 2. "texto": the on-screen caption that will be burned into the video: the key word, phrase or example of that moment in {{idioma}}, max 6 words. Copy it EXACTLY as spelled in the spoken text (same spelling, accents, umlauts, capitalization). Use an empty string if the scene has no clear key word (greetings, transitions).
 
 Return JSON: {"escenas": [{"n": <scene number>, "prompt": "...", "texto": "..."}]} with exactly {{cantidad}} items, in the same order.

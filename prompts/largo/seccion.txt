@@ -1,6 +1,6 @@
-You are writing section {{numero}} of {{total}} of a spoken video lesson for learners of {{idioma_nombre}}, level {{nivel}}.
+You are writing section {{numero}} of {{total}} of a spoken YouTube video lesson for Spanish-speaking learners of {{idioma_nombre}}, level {{nivel}}.
 
-⚠ MANDATORY LANGUAGE: the spoken text must be 100% in {{idioma_nombre}}. No words from other languages.
+MANDATORY LANGUAGE: the spoken text must be 100% in {{idioma_nombre}}. No words from other languages.
 
 Lesson: "{{titulo_leccion}}" (topic: {{tema}})
 Lesson outline:
@@ -8,14 +8,23 @@ Lesson outline:
 
 CURRENT SECTION: "{{titulo_seccion}}"
 Points to cover: {{contenido}}
-{{contexto}}
+Key points shown on screen during this section: {{puntos_clave}}
+Example sentences shown on screen during this section (say each of them word for word and explain it): {{ejemplos_obligatorios}}
+{{tabla_quiz}}{{ejemplos_usados}}{{contexto}}
 {{reglas_formato}}
 
 Rules:
 - Length: about {{palabras_objetivo}} words (between {{palabras_min}} and {{palabras_max}}). This is important: the video duration depends on it.
-- Explain in depth: clear explanation, several concrete examples, and a short practice moment for the viewer.
-- Vocabulary and grammar adapted to level {{nivel}}.
-- Written for text-to-speech: no markdown, no emojis, no bullet points, no headings, no stage directions.
 - {{regla_inicio}}
+- Every paragraph teaches something concrete: a rule, a contrast, an example with its explanation, a typical mistake and its correction, or a mini-practice. Mini-practice = ask the viewer to try, say "pause and think" in {{idioma_nombre}}, then give the answer.
+- Pattern interrupts: about every 60 to 90 seconds of speech (every 150-200 words) break the rhythm with a quick question to the viewer, a "common mistake" moment or a mini quiz, then the answer.
+- Banned: generic filler and meta-talk such as "this is very important for your language skills", "in this section we will look at", "as you can see", "let's dive in", praising the topic, or restating the outline. Say the thing instead of announcing it.
+- Never mention the video length, minutes, section numbers or these instructions.
+- Do NOT reuse example sentences from previous sections; invent new ones (the final recap may quote earlier ones briefly).
+- Tone: a warm, energetic teacher talking to one viewer. Vary sentence length and connect ideas so it flows like natural speech, not a list of fragments. Vary how you ask the viewer to pause.
+- Gaps to fill are spoken with "…" at the gap (never "blank", underscores or "X").
+- Vocabulary and grammar adapted to level {{nivel}}; clear sentences that sound natural when read aloud.
+- Written for text-to-speech: no markdown, no emojis, no bullet points, no headings, no stage directions, no parentheses with notes.
 - {{regla_final}}
-- Output ONLY the spoken text.
+
+Output format: first ONLY the spoken text. Then, on a new line, write exactly ###EJEMPLOS### and below it every example sentence in {{idioma_nombre}} that you used in the spoken text, one per line (this list is not spoken).

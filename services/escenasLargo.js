@@ -19,6 +19,7 @@ const PAUSA_RESCATE_MS = 60000;
 const MAX_CHARS_TEXTO = 60;
 // Por debajo de esta fracción del objetivo, la última escena de una sección se funde con la anterior
 const FRACCION_MINIMA = 0.4;
+const VENTANA_TEXTO_REPETIDO = 3;
 
 const FORMATOS = {
   horizontal: { composicion: 'Horizontal 16:9 composition.', google: '16:9', openai: '1536x1024', ancho: 1920, alto: 1080, fuente: 64, margenV: 70, margenH: 160 },
@@ -120,13 +121,43 @@ async function dirigirArte(escenas, ctx) {
   const lotes = [];
   for (let i = 0; i < escenas.length; i += ESCENAS_POR_LOTE) lotes.push(escenas.slice(i, i + ESCENAS_POR_LOTE));
   await ejecutarConLimite(lotes.map(lote => () => dirigirLote(lote, guia, ctx)), CONCURRENCIA_LOTES);
+  deduplicarTextos(escenas);
   return guia;
+}
+
+const normalizarTexto = t => String(t || '').normalize('NFC').toLowerCase()
+  .replace(/[\p{P}\p{S}]/gu, '').replace(/\s+/g, ' ').trim();
+
+/** Blanks a caption equal (normalized) to one still shown in the previous VENTANA_TEXTO_REPETIDO scenes. Mutates. */
+function deduplicarTextos(escenas) {
+  escenas.forEach((e, i) => {
+    const clave = normalizarTexto(e.textoPantalla);
+    if (!clave) return;
+    const previas = escenas.slice(Math.max(0, i - VENTANA_TEXTO_REPETIDO), i);
+    if (previas.some(p => normalizarTexto(p.textoPantalla) === clave)) e.textoPantalla = '';
+  });
+  return escenas;
+}
+
+// Image models render quoted words literally (garbled letters): the quoted fragment becomes a neutral symbol.
+const CITAS = [/"[^"\n]*"/g, /„[^“”"\n]*[“”"]/g, /“[^”\n]*”/g, /«[^»\n]*»/g, /‹[^›\n]*›/g, /‘[^’\n]*’/g,
+  /(?<=^|[\s([{,;:])'[^'\n]{1,80}?'(?=$|[\s.,;:!?)\]}])/g];
+
+const CONECTORES_CITA = /(^|\b(like|labell?ed|saying|says|reads?|reading|with|and|or|as|of|words?|text|called|named|between|to|from|is|are|shows?|showing|for|on|in)\s+)$/i;
+
+function quitarCitas(texto) {
+  let r = String(texto || '');
+  for (const re of CITAS) {
+    // Inside a noun phrase ("a bright 'zu' arrow") the word just becomes a modifier; after a verb/preposition it needs an article
+    r = r.replace(re, (m, offset, s) => (CONECTORES_CITA.test(s.slice(0, offset)) ? 'a symbol' : 'symbol'));
+  }
+  return r.replace(/\s{2,}/g, ' ').trim();
 }
 
 function componerPrompt(guia, escena, orientacion) {
   return `${textoGuia(guia)}
 
-Scene: ${escena.prompt}
+Scene: ${quitarCitas(escena.prompt)}
 
 Strict rules: absolutely no text, letters, words, numbers, labels or logos anywhere in the image. ${formatoDe(orientacion).composicion} Keep the bottom fifth of the frame visually calm, a caption will be overlaid there.`;
 }
@@ -216,6 +247,7 @@ function tiempoAss(seg) {
 /** Escribe el archivo ASS con el texto clave de cada escena (caja semitransparente abajo al centro). */
 function escribirAss(escenas, rutaAss, orientacion) {
   const { ancho, alto, fuente, margenV, margenH } = formatoDe(orientacion);
+  deduplicarTextos(escenas);
   const eventos = escenas
     .filter(e => e.textoPantalla && e.fin - e.inicio > 1.5)
     .map(e => `Dialogue: 0,${tiempoAss(e.inicio + 0.4)},${tiempoAss(e.fin - 0.3)},Clave,,0,0,0,,{\\fad(300,300)}${e.textoPantalla}`);
@@ -239,4 +271,4 @@ ${eventos.join('\n')}
   return eventos.length;
 }
 
-module.exports = { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss, FORMATOS };
+module.exports = { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss, FORMATOS, componerPrompt, quitarCitas, deduplicarTextos };

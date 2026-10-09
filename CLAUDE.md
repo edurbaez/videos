@@ -89,6 +89,10 @@ Prompts compartidos (no por nicho): `prompts/curso/` (guion, humanización, `you
 
 ---
 
+## Mapa de dependencias
+
+`MAPA.md` (generado por `npm run mapa` / `scripts/mapa.js`) lista por módulo qué requiere, quién lo usa, qué exporta y qué prompts lee, más endpoints → route y HTML → endpoints. Se regenera solo al iniciar cada sesión (hook `SessionStart` en `.claude/settings.local.json`) y no se commitea. Consultarlo antes de buscar a mano relaciones entre archivos; dentro de una sesión puede no reflejar los cambios hechos en ella.
+
 ## Archivos clave
 
 | Archivo | Responsabilidad |
@@ -106,13 +110,16 @@ Prompts compartidos (no por nicho): `prompts/curso/` (guion, humanización, `you
 | `services/storyboard.js` | Genera storyboard estructurado por nicho |
 | `services/audio.js` | Síntesis TTS (Google Neural2 o OpenAI) |
 | `services/subtitulos.js` | Genera subtítulos SRT con Whisper (OpenAI) |
-| `services/video.js` | Renderizado FFmpeg 1080×1920 con xfade |
+| `services/video.js` | Renderizado FFmpeg: shorts 1080×1920 con xfade (`generarVideo`); largo/curso (`generarVideoEscenas`) con Ken Burns + xfade alineados a `inicio/fin`, render por segmentos ~120 s en paralelo, ASS quemado, música opcional de `assets/musica/` con ducking (`sidechaincompress`) y loudnorm 2 pasadas (-14 LUFS, TP -2). `renderizarAudioEscenas`/`unirVideoAudio` reutilizados por Remotion |
+| `services/videoRemotion.js` | Render alternativo de largo con Remotion (`LARGO_RENDER=remotion`): bundle cacheado por proceso, imágenes servidas en 127.0.0.1 con token, video mudo + cadena de audio de `video.js`. Si falla, cae a FFmpeg. Fuente en `remotion/` (fuente Inter local) |
+| `services/lineaTiempoLargo.js` | Construye los props de Remotion (pura): subtítulos palabra a palabra, capítulos, texto clave y tarjetas de `visual` (ejemplo/quiz si se pronuncian, tabla al mencionarse o al 35 %, puntos clave al final) sin solaparse |
 | `services/telegram.js` | Envío de archivos y mensajes a Telegram (caption una sola vez: pie del video, o texto aparte si supera 1024) |
 | `services/youtube.js` | Subida a YouTube (OAuth2 por canal, metadata GPT desde `nichos/<id>/prompt-youtube-*.txt` o `prompts/curso/youtube-*.txt`, `categoryId` del nicho) |
-| `services/guionLargo.js` | Guion largo por secciones (esquema + sección a sección), monólogo o diálogo F/M |
-| `services/audioLargo.js` | TTS troceado (≤4000 bytes/pieza), une secciones con FFmpeg, calcula capítulos y línea de tiempo por oración |
-| `services/escenasLargo.js` | Agrupa la línea de tiempo en escenas (~N s), director de arte (guía de estilo + prompt/texto por escena, prompts en `prompts/largo/`), imágenes por escena y ASS con texto clave. Horizontal (largo) o vertical (`/curso/generar`, prompts de guion en `prompts/curso/`) |
-| `services/openai.js` | `chat({ model, prompt|messages, json, maxTokens, temperature, timeout })`: única vía a Chat Completions (timeout 120 s, reintento con backoff ante 429/5xx) |
+| `services/guionLargo.js` | Guion largo por secciones (esquema + sección a sección) con `OPENAI_MODELO_GUION`, monólogo o diálogo F/M, gancho inicial, ejemplos usados prohibidos en secciones siguientes. Cada sección trae `visual` saneado (`puntosClave`, `ejemplos`, `tabla`, `quiz`). `chat()` auxiliar (director de arte, curso) usa `OPENAI_MODELO_LARGO_AUX` |
+| `services/audioLargo.js` | TTS troceado (≤4000 bytes; ≤2500 en HD), perfil HD (Chirp 3 HD / `gpt-4o-mini-tts` con `instructions`) salvo `LARGO_TTS_HD=false`, secciones en WAV, capítulos, segmentos por oración con `palabras` alineadas por Whisper, loudnorm (-16 LUFS) y MP3 48 kHz 192k |
+| `services/alineacion.js` | Whisper con timestamps por palabra + alineación difusa monótona con las oraciones del guion (fallback proporcional si confianza < 0.6) |
+| `services/escenasLargo.js` | Agrupa la línea de tiempo en escenas (~N s), director de arte (guía de estilo + prompt/texto por escena, prompts en `prompts/largo/`), imágenes por escena y ASS con texto clave (sin repetir el de las 3 escenas previas; `quitarCitas` elimina fragmentos entrecomillados del prompt de imagen). Horizontal (largo) o vertical (`/curso/generar`, prompts de guion en `prompts/curso/`) |
+| `services/openai.js` | `chat({ model, prompt|messages, json, maxTokens, temperature, reasoningEffort, timeout })`: única vía a Chat Completions (timeout 120 s, 300 s en modelos de razonamiento, reintento con backoff ante 429/5xx). En modelos de razonamiento envía `max_completion_tokens` con reserva y omite `temperature` |
 | `services/googleAuth.js` | Singleton de `GoogleAuth` + `obtenerAccessToken()` (TTS e Imagen) |
 | `utils/prompts.js` | `renderPrompt()`, `joinHashtags()` y `leerPromptArchivo(carpeta, archivo)` (validado) |
 | `utils/estilos.js` | Mapas de estilos/escenarios (ES → EN) para prompts |
@@ -203,7 +210,14 @@ PORT              (opcional, default 3000)
 API_KEY           (opcional — exige la clave: header x-api-key en cualquier ruta; ?apiKey= solo en rutas SSE; cookie apiKey solo en GET /output/* y /youtube/auth. El frontend estático y /youtube/callback no la exigen. El frontend la pide y guarda vía public/js/api.js)
 CORS_ORIGIN       (opcional — default http://localhost:PORT)
 LARGO_MAX_MINUTOS (opcional — duración máxima de videos largos, default 30)
-LARGO_SEGUNDOS_POR_IMAGEN (opcional — default de segundos por imagen en videos largos, 10–120, default 30)
+LARGO_SEGUNDOS_POR_IMAGEN (opcional — default de segundos por imagen en videos largos, 10–120, default 20)
+LARGO_MUSICA      (opcional — "false" desactiva la música de fondo; si no, usa una pista de assets/musica/ si existe)
+LARGO_TTS_HD      (opcional — "false" vuelve a Neural2/tts-1 en largo y curso; default HD)
+LARGO_ALINEAR     (opcional — "false" desactiva la alineación con Whisper; default activa)
+LARGO_RENDER      (opcional — ffmpeg | remotion, default ffmpeg; remotion ~4× tiempo real en un PC de 4 núcleos)
+LARGO_REMOTION_CONCURRENCIA / LARGO_REMOTION_GL (opcional — ajustes de Remotion; GL default angle en Windows)
+OPENAI_MODELO_GUION (opcional — modelo del guion largo, default gpt-6.1-sol)
+OPENAI_MODELO_LARGO_AUX (opcional — modelo del director de arte y curso, default gpt-4o)
 LARGO_SEGUNDOS_ENTRE_IMAGENES (opcional — separación mínima entre peticiones de imagen en videos largos para no pasar la cuota por minuto, 0–60, default 10)
 MAX_PIPELINES     (opcional — pipelines simultáneos en la cola global, default 1)
 SCHEDULER_ENABLED (opcional — "true" activa el video automático diario; desactivado por defecto)
@@ -215,6 +229,8 @@ OUTPUT_RETENCION_DIAS (opcional — borra trabajos de output/ con más de N día
 ---
 
 ## Notas de modelos / APIs externas
+
+**Remotion**: licencia gratuita para individuos y empresas de ≤3 personas. `npm test` no bundlea ni renderiza Remotion.
 
 **Modelos de imagen**: la lista de modelos permitidos y los defaults viven solo en `middleware/seguridad.js` (`MODELOS_OPENAI`, `MODELO_IMAGEN_*`). `gpt-image-1` (retirado el 23-oct-2026) ya no se usa: `normalizarModeloImagen` lo trata como alias de `gpt-image-2`.
 

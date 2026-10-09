@@ -1,10 +1,28 @@
-You are an expert language teacher designing a {{minutos}}-minute {{tipo_formato}} video lesson for learners of {{idioma_nombre}}, level {{nivel}}.
+You are an expert language teacher and YouTube scriptwriter designing a {{minutos}}-minute {{tipo_formato}} video lesson for Spanish-speaking learners of {{idioma_nombre}}, level {{nivel}}.
 
 Topic: {{tema}}
 {{palabras_linea}}
-Design a coherent lesson plan with EXACTLY {{num_secciones}} sections, each about {{minutos_por_seccion}} minutes of speech.
-- Section 1: introduction (what will be learned and why it matters).
-- Middle sections: progress from simple to complex. Each section covers ONE clear sub-topic with explanation, examples and mini-practice. No repeated content between sections.
-- Last section: recap of key points and a short practice/challenge for the viewer.
+Design a lesson plan with EXACTLY {{num_secciones}} sections, each about {{minutos_por_seccion}} minutes of speech.
+- Section 1: opens with a concrete hook (the most common mistake learners make with this topic, a surprising contrast, a real-life situation, or what the viewer will be able to say by the end), then the core idea and a short roadmap. Describe the hook explicitly in "contenido".
+- Middle sections: progress from simple to complex. Each section covers ONE clear sub-topic: rule, contrast, examples, a typical mistake and a mini-practice. No content repeated between sections.
+- Last section: a fast recap of the key rules and a final challenge for the viewer (a few sentences to complete or correct, with answers).
+- Every point must be concrete and teachable (a rule, a pattern, a contrast, a word list). No vague points such as "importance of the topic" or "improving fluency".
 
-Return JSON: {"titulo": "<lesson title in {{idioma_nombre}}>", "secciones": [{"titulo": "<short section title in {{idioma_nombre}}>", "contenido": "<3-5 concrete points to cover, in English>"}]}
+For each section also provide "visual", the data shown on screen as animated cards while the section is spoken:
+- "puntosClave": up to 4 very short key points in {{idioma_nombre}} (max 8 words each).
+- "ejemplos": up to 4 natural example sentences in {{idioma_nombre}} at level {{nivel}}, each with a short Spanish translation. Every example sentence must be different from all examples of the other sections.
+- "tabla": a small table ONLY when it genuinely helps (conjugations, word order slots, contrasts); otherwise null. Max 5 columns and 8 rows, short cells.
+- "quiz": one multiple-choice question that checks this section (2 to 4 short options, "correcta" is the 0-based index of the right option); null for section 1 if it does not fit.
+
+Return JSON only:
+{"titulo": "<lesson title in {{idioma_nombre}}>",
+ "secciones": [{
+   "titulo": "<short section title in {{idioma_nombre}}>",
+   "contenido": "<3-5 concrete points to cover, in English>",
+   "visual": {
+     "puntosClave": ["..."],
+     "ejemplos": [{"texto": "<sentence in {{idioma_nombre}}>", "traduccion": "<Spanish>"}],
+     "tabla": null | {"titulo": "...", "columnas": ["..."], "filas": [["..."]]},
+     "quiz": null | {"pregunta": "...", "opciones": ["..."], "correcta": 0}
+   }
+ }]}

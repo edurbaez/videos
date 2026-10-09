@@ -6,9 +6,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "mapa": "node scripts/mapa.js"
   },
   "dependencies": {
+    "@remotion/bundler": "4.0.534",
+    "@remotion/renderer": "4.0.534",
     "axios": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.0",
@@ -21,6 +24,9 @@
     "googleapis": "^171.4.0",
     "multer": "^2.1.1",
     "node-cron": "^4.6.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "4.0.534",
     "uuid": "^9.0.0"
   }
 }

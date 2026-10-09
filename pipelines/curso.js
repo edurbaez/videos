@@ -4,7 +4,7 @@ const { DIR_CURSO, urlCurso } = require('../utils/archivos');
 const { ts } = require('../utils/log');
 const { LANG_NAMES } = require('../utils/constantes');
 const { renderPrompt } = require('../utils/prompts');
-const { resolverVozGoogle } = require('../services/audio');
+const { resolverVozGoogle, resolverVozGoogleHd } = require('../services/audio');
 const { chat } = require('../services/guionLargo');
 const { generarAudioLargo } = require('../services/audioLargo');
 const { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss, FORMATOS } = require('../services/escenasLargo');
@@ -106,7 +106,7 @@ async function ejecutarSinCola(p, emit) {
     const dirTrabajo = path.join(DIR_CURSO, `trabajo-${id}`);
     let rutaVideoCurso = null;
     try {
-      const { nombreVoz, langCode } = resolverVozGoogle(idioma, genero);
+      const { nombreVoz, langCode } = (process.env.LARGO_TTS_HD === 'false' ? resolverVozGoogle : resolverVozGoogleHd)(idioma, genero);
       const audio = await generarAudioLargo([{ titulo: tema, texto: guion }], rutaMp3, {
         formato: 'monologo', genero, tts: 'google', idioma, dirTrabajo,
       });

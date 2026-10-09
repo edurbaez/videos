@@ -6,6 +6,8 @@ const { generarGuionLargo, limpiarEtiquetas, PALABRAS_POR_MINUTO } = require('..
 const { generarAudioLargo, formatearTiempo } = require('../services/audioLargo');
 const { agruparEscenas, dirigirArte, generarImagenesEscenas, escribirAss } = require('../services/escenasLargo');
 const { generarVideoEscenas } = require('../services/video');
+const { generarVideoRemotion, modoRender } = require('../services/videoRemotion');
+const { construirLineaTiempo } = require('../services/lineaTiempoLargo');
 const yt = require('../services/youtube');
 const { cola } = require('../lib/cola');
 const { guardarEntrada } = require('../utils/historial');
@@ -14,7 +16,7 @@ const MIN_MINUTOS = 3;
 const MAX_MINUTOS = parseInt(process.env.LARGO_MAX_MINUTOS) || 30;
 const SEG_IMAGEN_MIN = 10;
 const SEG_IMAGEN_MAX = 120;
-const SEGUNDOS_POR_IMAGEN = Math.min(SEG_IMAGEN_MAX, Math.max(SEG_IMAGEN_MIN, parseInt(process.env.LARGO_SEGUNDOS_POR_IMAGEN) || 30));
+const SEGUNDOS_POR_IMAGEN = Math.min(SEG_IMAGEN_MAX, Math.max(SEG_IMAGEN_MIN, parseInt(process.env.LARGO_SEGUNDOS_POR_IMAGEN) || 20));
 
 const LIMITES = {
   minMinutos: MIN_MINUTOS, maxMinutos: MAX_MINUTOS, palabrasPorMinuto: PALABRAS_POR_MINUTO,
@@ -129,9 +131,28 @@ async function ejecutarSinCola(p, emit) {
       meta.numImagenes = escenas.length;
       emit('imagen_lista', { png: meta.png, total: escenas.length, reutilizadas, errorImagen });
 
-      emit('progreso', { paso: 5, mensaje: 'Renderizando video 1920×1080...' });
-      const conTexto = escribirAss(escenas, rutaAss);
-      await generarVideoEscenas(rutaMp3, escenas, rutaMp4, { rutaAss: conTexto ? rutaAss : null, dirTrabajo });
+      let renderizado = false;
+      if (modoRender() === 'remotion') {
+        emit('progreso', { paso: 5, mensaje: 'Renderizando video 1920×1080 con gráficos (Remotion)...' });
+        try {
+          const props = construirLineaTiempo({
+            titulo: guion.titulo, secciones: guion.secciones, capitulos, segmentos, escenas, duracion: duracionAudio,
+          });
+          await generarVideoRemotion(props, {
+            rutaAudio: rutaMp3, rutaDestino: rutaMp4, dirImagenes: dirImg, dirTrabajo,
+            onProgreso: p => emit('render_progreso', { porcentaje: Math.round(p * 100) }),
+          });
+          renderizado = true;
+        } catch (errRemotion) {
+          console.warn(`[${ts()}] Largo ${id}: Remotion falló, se renderiza con FFmpeg: ${errRemotion.message.slice(0, 500)}`);
+          emit('progreso', { paso: 5, mensaje: 'El render con gráficos falló; renderizando con FFmpeg...' });
+        }
+      }
+      if (!renderizado) {
+        emit('progreso', { paso: 5, mensaje: 'Renderizando video 1920×1080...' });
+        const conTexto = escribirAss(escenas, rutaAss);
+        await generarVideoEscenas(rutaMp3, escenas, rutaMp4, { rutaAss: conTexto ? rutaAss : null, dirTrabajo });
+      }
       meta.video = urlDeRuta(rutaMp4);
       guardarMeta();
       emit('video_listo', { video: meta.video });

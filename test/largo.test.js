@@ -64,4 +64,13 @@ test('segmentarSeccion distributes time by sentence length and rescales to the s
   assert.ok(Math.abs(segs[1].fin - 112) < 1e-9);
   assert.ok(Math.abs(segs[2].inicio - 114) < 1e-9);
   assert.ok(Math.abs(segs[2].fin - 118) < 1e-9);
+  // Fallback word times stay inside their sentence
+  assert.deepEqual(segs[1].palabras.map(p => p.texto), ['Tres', 'cuatro', 'cinco', 'seis.']);
+  assert.equal(segs[1].palabras[0].inicio, segs[1].inicio);
+  assert.ok(Math.abs(segs[1].palabras.at(-1).fin - segs[1].fin) < 1e-9);
+});
+
+test('trocearTexto honours a smaller byte limit (HD profile)', () => {
+  const texto = 'Das ist ein kurzer Satz mit Umlauten äöü. '.repeat(200);
+  for (const t of trocearTexto(texto, 2500)) assert.ok(Buffer.byteLength(t, 'utf8') <= 2500);
 });

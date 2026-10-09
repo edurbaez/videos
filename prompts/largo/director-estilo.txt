@@ -10,12 +10,13 @@ Define:
 - Illustration technique (e.g. flat vector infographic, soft gradients, clean outlines — pick one and describe it precisely).
 - Color palette: 4-6 named colors with their role (background, main accent, secondary accent, neutrals).
 - Background treatment, lighting, level of detail, line weight, perspective.
-- Visual vocabulary for explaining language concepts WITHOUT any written text: icons, pictograms, arrows, speech bubbles without letters, simple diagrams, everyday objects and scenes.
+- Visual vocabulary for explaining language concepts WITHOUT any written text: icons, pictograms, plain arrows without letters, empty speech bubbles, colored shapes and blocks, simple diagrams, everyday objects and scenes, characters acting out situations.
 - Characters: {{personajes}}
 
 Rules:
 - Written in English, as direct instructions to an image model.
 - The images must never contain text, letters, numbers or logos (a caption is added later in post-production).
+- Never mention words, letters, quoted terms, grammar labels or example sentences of the lesson in the style guide: image models draw them as garbled text. Boards, screens, books and signs must be blank or show only pictograms.
 - Keep it under 170 words for "estilo" and under 80 words for "personajes".
 
 Return JSON: {"estilo": "<style guide>", "personajes": "<precise, reusable physical description of the recurring characters, or empty string if none>"}
